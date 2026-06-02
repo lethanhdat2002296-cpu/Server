@@ -22,6 +22,7 @@
     <button class="nav-tab active" data-page="home">Trang chính</button>
     <button class="nav-tab" data-page="checkin">Check-in</button>
     <button class="nav-tab" data-page="history">Lịch sử</button>
+    <button class="nav-tab" data-page="payment">Thanh toán</button>
     <button class="nav-tab" data-page="settings">Cài đặt</button>
   </nav>
 
@@ -113,6 +114,74 @@
           <li class="empty-state">
             <div class="ico">📅</div>
             <div>Chưa có check-in nào</div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ THANH TOÁN ============ -->
+    <section id="page-payment" class="page">
+      <div class="page-header">
+        <div class="page-title">Thanh toán</div>
+        <div class="page-subtitle">Gửi biên lai chuyển khoản - hệ thống tự kiểm tra và xác nhận qua email</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Thông tin người chuyển khoản</div>
+        <form id="payment-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Họ và tên *</label>
+              <input type="text" name="full_name" required>
+              <div class="field-error"></div>
+            </div>
+            <div class="form-group">
+              <label>Số điện thoại *</label>
+              <input type="text" name="phone" maxlength="10" required>
+              <div class="field-error"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Email nhận xác nhận *</label>
+            <input type="email" name="email" required>
+            <div class="field-hint">Email xác nhận sẽ được gửi đến địa chỉ này</div>
+            <div class="field-error"></div>
+          </div>
+
+          <div class="form-group">
+            <label>Ảnh biên lai chuyển khoản *</label>
+            <div id="payment-drop" class="drop-zone">
+              <input type="file" id="payment-image" accept="image/*" hidden>
+              <label for="payment-image" style="cursor:pointer;display:block;">
+                <div style="font-size:42px;margin-bottom:8px;">📷</div>
+                <div style="font-weight:600;margin-bottom:4px;">Chọn ảnh biên lai</div>
+                <div style="font-size:12px;color:#7f8c8d;">Hỗ trợ JPG, PNG. Tối đa 5MB. Ảnh sẽ tự nén lại nếu cần.</div>
+              </label>
+            </div>
+            <div id="payment-preview-wrap" style="display:none;margin-top:14px;">
+              <img id="payment-preview" style="max-width:100%;max-height:340px;border-radius:10px;border:1px solid #ecf0f1;" />
+              <div style="margin-top:8px;text-align:right;">
+                <button type="button" class="btn-secondary" id="payment-clear" style="max-width:140px;display:inline-block;width:auto;padding:6px 16px;">Đổi ảnh</button>
+              </div>
+            </div>
+            <div id="payment-ocr-status" style="margin-top:10px;font-size:13px;"></div>
+            <div class="field-error"></div>
+          </div>
+
+          <div id="payment-msg" class="message"></div>
+
+          <button type="submit" class="btn-primary" id="payment-submit" disabled style="max-width:240px;">
+            Gửi biên lai
+          </button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Lịch sử thanh toán</div>
+        <ul class="history-list" id="payment-history-list">
+          <li class="empty-state">
+            <div class="ico">💳</div>
+            <div>Chưa có thanh toán nào</div>
           </li>
         </ul>
       </div>

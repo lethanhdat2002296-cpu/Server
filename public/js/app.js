@@ -81,6 +81,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     // History full: render lại từ state (không gọi API)
     if (target === 'history') renderHistory(false);
     if (target === 'checkin') renderCheckinTab();
+    if (target === 'payment') initPaymentTab();
   });
 });
 
@@ -400,6 +401,294 @@ document.getElementById('password-form').addEventListener('submit', async (e) =>
     showMsg('password-msg', 'error', r?.data?.error || 'Đổi mật khẩu thất bại');
   }
 });
+
+// ============ PAYMENT TAB ============
+let paymentTabInitialized = false;
+let paymentImageBase64 = null;
+let paymentImageMime = null;
+let paymentOcrText = '';
+let paymentIsReceipt = false;
+let tesseractPromise = null;
+
+// Lazy load Tesseract.js từ CDN (~2MB), chỉ tải khi user click tab Thanh toán
+function loadTesseract() {
+  if (tesseractPromise) return tesseractPromise;
+  tesseractPromise = new Promise((resolve, reject) => {
+    if (window.Tesseract) return resolve(window.Tesseract);
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = () => resolve(window.Tesseract);
+    s.onerror = () => reject(new Error('Không tải được Tesseract.js'));
+    document.head.appendChild(s);
+  });
+  return tesseractPromise;
+}
+
+// Resize ảnh xuống max width 1200px, JPEG quality 0.85
+async function resizeImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 1200;
+        const ratio = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve({ dataUrl, mime: 'image/jpeg', width: w, height: h });
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Keyword detect (giống logic server)
+const RECEIPT_KEYWORDS = [
+  'VIETCOMBANK','VCB','TECHCOMBANK','TCB','VIETINBANK','VTB','CTG','BIDV',
+  'AGRIBANK','VBA','MB BANK','MBBANK','MILITARY BANK','ACB','A CHAU',
+  'VPBANK','VP BANK','SACOMBANK','STB','TPBANK','TP BANK','HDBANK','HD BANK',
+  'EXIMBANK','SHB','OCB','MSB','MARITIME BANK','NCB','SEABANK','PVCOMBANK',
+  'MOMO','MO MO','ZALOPAY','ZALO PAY','VNPAY','VN PAY','SHOPEEPAY','SHOPEE PAY',
+  'VIETTELPAY','VIETTEL MONEY',
+  'CHUYEN KHOAN','CHUYỂN KHOẢN','CHUYEN TIEN','CHUYỂN TIỀN',
+  'GIAO DICH','GIAO DỊCH','TRANSACTION','TRANSFER',
+  'BIEN LAI','BIÊN LAI','HOA DON','HÓA ĐƠN',
+  'THANH TOAN','THANH TOÁN','SO TIEN','SỐ TIỀN',
+  'NOI DUNG','NỘI DUNG','NGUOI NHAN','NGƯỜI NHẬN','NGUOI GUI','NGƯỜI GỬI',
+  'STK','TAI KHOAN','TÀI KHOẢN','THANH CONG','THÀNH CÔNG',
+  'SUCCESS','SUCCESSFUL','VND','DONG','ĐỒNG'
+];
+function analyzeText(text) {
+  if (!text) return { is_receipt: false, matched: [] };
+  const up = text.toUpperCase();
+  const matched = RECEIPT_KEYWORDS.filter(k => up.includes(k));
+  return { is_receipt: matched.length >= 2, matched };
+}
+
+function setOcrStatus(type, message) {
+  const el = document.getElementById('payment-ocr-status');
+  if (!el) return;
+  if (!message) { el.innerHTML = ''; return; }
+  const cls = type === 'processing' ? 'ocr-status processing'
+            : type === 'success'    ? 'ocr-status success'
+            :                          'ocr-status warning';
+  const ico = type === 'processing' ? '<span class="spinner"></span>'
+            : type === 'success'    ? '✓'
+            :                          '⚠';
+  el.innerHTML = `<div class="${cls}">${ico}<span>${message}</span></div>`;
+}
+
+async function processPaymentImage(file) {
+  if (!file) return;
+  setOcrStatus('processing', 'Đang xử lý ảnh...');
+  document.getElementById('payment-submit').disabled = true;
+
+  // Resize trước
+  let resized;
+  try {
+    resized = await resizeImage(file);
+  } catch (e) {
+    setOcrStatus('warning', 'Không đọc được file ảnh');
+    return;
+  }
+  paymentImageBase64 = resized.dataUrl;
+  paymentImageMime = resized.mime;
+  document.getElementById('payment-preview').src = resized.dataUrl;
+  document.getElementById('payment-preview-wrap').style.display = 'block';
+  document.getElementById('payment-drop').style.display = 'none';
+
+  // OCR
+  setOcrStatus('processing', 'Đang tải bộ nhận diện ký tự (lần đầu mất ~10s)...');
+  let Tesseract;
+  try {
+    Tesseract = await loadTesseract();
+  } catch (e) {
+    setOcrStatus('warning', 'Không tải được công cụ OCR. Bạn vẫn có thể gửi - hệ thống sẽ xác minh thủ công.');
+    paymentOcrText = '';
+    paymentIsReceipt = false;
+    document.getElementById('payment-submit').disabled = false;
+    return;
+  }
+
+  setOcrStatus('processing', 'Đang đọc nội dung ảnh...');
+  try {
+    const result = await Tesseract.recognize(resized.dataUrl, 'eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          setOcrStatus('processing', `Đang đọc nội dung ảnh... ${Math.round(m.progress * 100)}%`);
+        }
+      }
+    });
+    paymentOcrText = result.data.text || '';
+    const analysis = analyzeText(paymentOcrText);
+    paymentIsReceipt = analysis.is_receipt;
+
+    if (analysis.is_receipt) {
+      const banks = analysis.matched
+        .filter(k => !['VND','DONG','ĐỒNG','STK','SUCCESS','SUCCESSFUL','THANH CONG','THÀNH CÔNG'].includes(k))
+        .slice(0, 3);
+      setOcrStatus('success', `Đã xác nhận là biên lai chuyển khoản${banks.length ? ' (' + banks.join(', ') + ')' : ''}`);
+    } else {
+      setOcrStatus('warning', 'Ảnh này có vẻ KHÔNG phải biên lai chuyển khoản ngân hàng/Momo. Bạn vẫn có thể gửi nhưng sẽ chờ xác minh thủ công.');
+    }
+    document.getElementById('payment-submit').disabled = false;
+  } catch (e) {
+    console.error('OCR error', e);
+    setOcrStatus('warning', 'Không xử lý được ảnh. Bạn vẫn có thể gửi để xác minh thủ công.');
+    paymentOcrText = '';
+    paymentIsReceipt = false;
+    document.getElementById('payment-submit').disabled = false;
+  }
+}
+
+function clearPaymentImage() {
+  paymentImageBase64 = null;
+  paymentImageMime = null;
+  paymentOcrText = '';
+  paymentIsReceipt = false;
+  document.getElementById('payment-image').value = '';
+  document.getElementById('payment-preview').src = '';
+  document.getElementById('payment-preview-wrap').style.display = 'none';
+  document.getElementById('payment-drop').style.display = 'block';
+  document.getElementById('payment-submit').disabled = true;
+  setOcrStatus(null);
+}
+
+async function loadPaymentHistory() {
+  const r = await api('GET', '/api/payment/history');
+  const listEl = document.getElementById('payment-history-list');
+  if (!r || !r.ok || !listEl) return;
+  const items = r.data.history || [];
+  if (items.length === 0) {
+    listEl.innerHTML = `<li class="empty-state"><div class="ico">💳</div><div>Chưa có thanh toán nào</div></li>`;
+    return;
+  }
+  listEl.innerHTML = items.map(item => {
+    const verifiedBadge = item.is_receipt
+      ? '<span class="badge verified">✓ Đã xác minh</span>'
+      : '<span class="badge pending">⏳ Chờ xác minh</span>';
+    const sentBadge = item.email_sent ? '<span class="badge sent">📧 Đã gửi mail</span>' : '';
+    const date = new Date(item.created_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    return `<li class="history-item">
+      <div>
+        <div class="history-date">#${item.id} - ${item.full_name}${verifiedBadge}${sentBadge}</div>
+        <div class="history-date-sub">${date} • ${item.email} • ${item.phone}</div>
+        ${item.detected_banks ? `<div class="history-date-sub">Phát hiện: ${item.detected_banks}</div>` : ''}
+      </div>
+    </li>`;
+  }).join('');
+}
+
+function initPaymentTab() {
+  if (paymentTabInitialized) {
+    loadPaymentHistory();
+    return;
+  }
+  paymentTabInitialized = true;
+
+  const form = document.getElementById('payment-form');
+
+  // Auto-fill từ appState
+  if (appState.user) {
+    form.full_name.value = appState.user.full_name || '';
+    form.phone.value = appState.user.phone || '';
+    form.email.value = appState.user.email || '';
+  }
+
+  // Phone: chỉ cho nhập số
+  form.phone.addEventListener('input', e => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+  });
+
+  // File picker
+  document.getElementById('payment-image').addEventListener('change', e => {
+    if (e.target.files && e.target.files[0]) processPaymentImage(e.target.files[0]);
+  });
+
+  // Drag & drop
+  const drop = document.getElementById('payment-drop');
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.remove('dragover');
+  }));
+  drop.addEventListener('drop', e => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) processPaymentImage(f);
+  });
+
+  // Clear
+  document.getElementById('payment-clear').addEventListener('click', clearPaymentImage);
+
+  // Submit
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    form.querySelectorAll('input').forEach(i => showFieldError(i, null));
+
+    const data = {
+      full_name: form.full_name.value.trim(),
+      phone: form.phone.value.trim(),
+      email: form.email.value.trim().toLowerCase(),
+      image_data: paymentImageBase64,
+      image_mime: paymentImageMime,
+      ocr_text: paymentOcrText
+    };
+
+    if (!data.image_data) {
+      showMsg('payment-msg', 'error', 'Vui lòng đính kèm ảnh biên lai');
+      return;
+    }
+
+    // Cảnh báo nếu OCR không phát hiện biên lai
+    if (paymentOcrText && !paymentIsReceipt) {
+      if (!confirm('Hệ thống chưa xác minh được đây là biên lai chuyển khoản. Bạn có chắc muốn gửi?')) {
+        return;
+      }
+    }
+
+    const btn = document.getElementById('payment-submit');
+    btn.disabled = true;
+    btn.textContent = 'Đang gửi...';
+    showMsg('payment-msg', 'info', 'Đang gửi biên lai và email xác nhận...');
+
+    const r = await api('POST', '/api/payment/submit', data);
+
+    if (r && r.ok) {
+      const msg = r.data.email_sent
+        ? `✓ Đã gửi thành công! Email xác nhận đã được gửi đến ${data.email}.`
+        : r.data.email_dev_mode
+          ? '✓ Đã ghi nhận. Email DEV mode (xem console server).'
+          : `✓ Đã ghi nhận biên lai. ⚠ Không gửi được email (${r.data.email_error || 'Lỗi SMTP'}).`;
+      showMsg('payment-msg', 'success', msg);
+      // Reset form
+      clearPaymentImage();
+      loadPaymentHistory();
+    } else {
+      if (r?.data?.fields) {
+        Object.entries(r.data.fields).forEach(([k, v]) => {
+          if (form[k]) showFieldError(form[k], v);
+        });
+      }
+      showMsg('payment-msg', 'error', r?.data?.error || 'Gửi thất bại');
+    }
+    btn.disabled = !paymentImageBase64;
+    btn.textContent = 'Gửi biên lai';
+  });
+
+  // Load history
+  loadPaymentHistory();
+}
 
 // ============ INIT ============
 bootstrap();
