@@ -24,6 +24,7 @@
     <button class="nav-tab" data-page="history">Lịch sử</button>
     <button class="nav-tab" data-page="payment">Thanh toán</button>
     <button class="nav-tab" data-page="admin" id="nav-admin" style="display:none;">⚙ Quản trị</button>
+    <button class="nav-tab" data-page="reports" id="nav-reports" style="display:none;">📊 Báo cáo</button>
     <button class="nav-tab" data-page="settings">Cài đặt</button>
   </nav>
 
@@ -238,6 +239,103 @@
         </div>
       </div>
     </div>
+
+    <!-- ============ BÁO CÁO (chỉ admin) ============ -->
+    <section id="page-reports" class="page">
+      <div class="page-header">
+        <div class="page-title">Báo cáo</div>
+        <div class="page-subtitle">Tổng quan + báo cáo nhanh / chi tiết trong ngày. Tất cả có thể xuất Excel.</div>
+      </div>
+
+      <!-- 1. BÁO CÁO TỔNG -->
+      <div class="card">
+        <div class="card-title">📈 Báo cáo tổng</div>
+        <div class="stats-grid" style="margin-bottom:0;">
+          <div class="stat-card">
+            <div class="stat-label">Tổng số User</div>
+            <div class="stat-value"><span id="rep-total-users">0</span><span class="stat-suffix">người</span></div>
+          </div>
+          <div class="stat-card checked">
+            <div class="stat-label">Đã check-in hôm nay</div>
+            <div class="stat-value"><span id="rep-checked-today">0</span><span class="stat-suffix">người</span></div>
+          </div>
+          <div class="stat-card missed">
+            <div class="stat-label">Chưa check-in hôm nay</div>
+            <div class="stat-value"><span id="rep-not-checked-today">0</span><span class="stat-suffix">người</span></div>
+          </div>
+          <div class="stat-card total">
+            <div class="stat-label">Tổng check-in mọi thời</div>
+            <div class="stat-value"><span id="rep-total-checkins">0</span><span class="stat-suffix">lượt</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Date picker chung cho 2 báo cáo daily -->
+      <div class="card" style="padding:14px 20px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <label style="font-weight:600;font-size:14px;">Chọn ngày:</label>
+          <input type="date" id="rep-date" style="padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
+          <button class="btn-secondary" id="rep-reload" style="max-width:120px;display:inline-block;width:auto;padding:8px 16px;">🔄 Reload</button>
+        </div>
+      </div>
+
+      <!-- 2. BÁO CÁO NHANH -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div class="card-title" style="margin-bottom:4px;">⚡ Báo cáo nhanh trong ngày</div>
+            <div style="font-size:13px;color:#7f8c8d;" id="rep-daily-summary">Đang tải...</div>
+          </div>
+          <button class="btn-primary" id="rep-daily-export" style="max-width:180px;padding:8px 16px;">📥 Xuất Excel</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="report-table" id="rep-daily-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Họ và tên</th>
+                <th>Số điện thoại</th>
+                <th>Email</th>
+                <th>Check-in</th>
+                <th>Giờ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 3. BÁO CÁO CHI TIẾT -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div class="card-title" style="margin-bottom:4px;">📋 Báo cáo chi tiết</div>
+            <div style="font-size:13px;color:#7f8c8d;">Streak, tổng đã check, tổng quên - cho mỗi user</div>
+          </div>
+          <button class="btn-primary" id="rep-detailed-export" style="max-width:180px;padding:8px 16px;">📥 Xuất Excel</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="report-table" id="rep-detailed-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Họ và tên</th>
+                <th>Số điện thoại</th>
+                <th>Check-in</th>
+                <th>Ngày liên tiếp</th>
+                <th>Đã check-in</th>
+                <th>Chưa check-in</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="7" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     <!-- ============ CÀI ĐẶT ============ -->
     <section id="page-settings" class="page">

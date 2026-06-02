@@ -2,59 +2,9 @@ const express = require('express');
 const { query } = require('../lib/db');
 const config = require('../config');
 const { authRequired } = require('../middleware/auth');
+const { nowInTimezone, addDays, daysBetween, toLocalDateHour } = require('../utils/time');
 
 const router = express.Router();
-
-// ============ TIMEZONE HELPER ============
-// Vercel chạy UTC mặc định, cần lấy giờ theo TIMEZONE config
-function nowInTimezone() {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: config.TIMEZONE,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false
-  }).formatToParts(new Date());
-  const obj = {};
-  for (const p of parts) obj[p.type] = p.value;
-  // obj.hour có thể là '24' lúc nửa đêm trong vài locale - chuẩn hoá về '00'
-  const hour = obj.hour === '24' ? '00' : obj.hour;
-  return {
-    date: `${obj.year}-${obj.month}-${obj.day}`,
-    time: `${hour}:${obj.minute}:${obj.second}`,
-    hour: parseInt(hour, 10),
-    minute: parseInt(obj.minute, 10)
-  };
-}
-
-// Cộng/trừ ngày dạng YYYY-MM-DD (dùng UTC noon để tránh DST shift)
-function addDays(dateStr, n) {
-  const d = new Date(`${dateStr}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-// Đếm số ngày giữa 2 ngày (inclusive)
-function daysBetween(startDate, endDate) {
-  const s = new Date(`${startDate}T12:00:00Z`);
-  const e = new Date(`${endDate}T12:00:00Z`);
-  return Math.round((e - s) / 86400000) + 1;
-}
-
-// Đổi 1 timestamp về ngày + giờ trong timezone
-function toLocalDateHour(timestamp) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: config.TIMEZONE,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', hour12: false
-  }).formatToParts(new Date(timestamp));
-  const o = {};
-  for (const p of parts) o[p.type] = p.value;
-  const hour = o.hour === '24' ? '00' : o.hour;
-  return {
-    date: `${o.year}-${o.month}-${o.day}`,
-    hour: parseInt(hour, 10)
-  };
-}
 
 function getCheckinStatusFromTime(t, hasCheckedIn, checkTime) {
   const inWindow = t.hour === config.CHECKIN_START_HOUR;   // 5:00 - 5:59

@@ -548,6 +548,32 @@ a { color: #0984e3; text-decoration: none; }
 .btn-reject { background: #f8d7da; color: #721c24; }
 .btn-reject:hover { background: #f1aeb5; }
 
+/* ============ REPORT TABLE ============ */
+.report-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  min-width: 600px;
+}
+.report-table th, .report-table td {
+  padding: 11px 14px;
+  text-align: left;
+  border-bottom: 1px solid #ecf0f1;
+}
+.report-table th {
+  background: #f8f9fa;
+  font-weight: 700;
+  color: #2d3436;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+.report-table tr:hover td { background: #fafbfc; }
+.report-table .num { font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.report-table .checked-yes { color: #00b894; font-weight: 700; }
+.report-table .checked-no { color: #d63031; font-weight: 700; }
+
 /* ============ SKELETON LOADER ============ */
 .skeleton {
   display: inline-block;

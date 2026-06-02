@@ -1,7 +1,9 @@
 const express = require('express');
 const { query } = require('../lib/db');
+const config = require('../config');
 const { adminRequired } = require('../middleware/auth');
 const { sendPaymentConfirmed, sendPaymentRejected } = require('../utils/email');
+const { nowInTimezone, addDays, daysBetween, toLocalDateHour } = require('../utils/time');
 
 const router = express.Router();
 
@@ -160,7 +162,7 @@ router.post('/payments/:id/reject', adminRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ============== STATS ==============
+// ============== STATS (legacy) ==============
 router.get('/stats', adminRequired, async (req, res, next) => {
   try {
     const [usersRes, paymentsRes, checkinsRes] = await Promise.all([
@@ -174,6 +176,151 @@ router.get('/stats', adminRequired, async (req, res, next) => {
       total_users: usersRes.rows[0].c,
       total_checkins: checkinsRes.rows[0].c,
       payments: counts
+    });
+  } catch (err) { next(err); }
+});
+
+// ============== BÁO CÁO TỔNG ==============
+// Tổng user (loại trừ admin), số check-in hôm nay, tổng payment các trạng thái
+router.get('/reports/overview', adminRequired, async (req, res, next) => {
+  try {
+    const t = nowInTimezone();
+    const [usersRes, allUsersRes, todayCheckRes, totalCheckRes, paymentsRes] = await Promise.all([
+      query("SELECT COUNT(*)::int AS c FROM users WHERE role != 'admin'"),
+      query('SELECT COUNT(*)::int AS c FROM users'),
+      query("SELECT COUNT(*)::int AS c FROM check_ins WHERE check_date = $1", [t.date]),
+      query('SELECT COUNT(*)::int AS c FROM check_ins'),
+      query("SELECT status, COUNT(*)::int AS c FROM payments GROUP BY status")
+    ]);
+    const paymentCounts = { pending: 0, confirmed: 0, rejected: 0 };
+    for (const row of paymentsRes.rows) paymentCounts[row.status] = row.c;
+
+    res.json({
+      date: t.date,
+      server_time: `${t.date} ${t.time}`,
+      total_users: usersRes.rows[0].c,           // user thường (không tính admin)
+      total_users_with_admin: allUsersRes.rows[0].c,
+      checked_in_today: todayCheckRes.rows[0].c,
+      not_checked_today: usersRes.rows[0].c - todayCheckRes.rows[0].c,
+      total_checkins_all_time: totalCheckRes.rows[0].c,
+      payments: paymentCounts
+    });
+  } catch (err) { next(err); }
+});
+
+// ============== BÁO CÁO NHANH TRONG NGÀY ==============
+// Họ tên / SĐT / check-in (hôm đó) + sum
+// Query param: date (mặc định hôm nay)
+router.get('/reports/daily', adminRequired, async (req, res, next) => {
+  try {
+    const date = req.query.date || nowInTimezone().date;
+    const r = await query(`
+      SELECT u.id, u.full_name, u.phone, u.email, u.username,
+             c.check_time
+      FROM users u
+      LEFT JOIN check_ins c ON c.user_id = u.id AND c.check_date = $1
+      WHERE u.role != 'admin'
+      ORDER BY (c.check_time IS NULL), u.full_name
+    `, [date]);
+
+    const rows = r.rows.map(u => ({
+      full_name: u.full_name,
+      phone: u.phone,
+      email: u.email,
+      checked_in: !!u.check_time,
+      check_time: u.check_time ? u.check_time.slice(0, 5) : null
+    }));
+    const checked = rows.filter(x => x.checked_in).length;
+
+    res.json({
+      date,
+      total: rows.length,
+      checked,
+      not_checked: rows.length - checked,
+      rows
+    });
+  } catch (err) { next(err); }
+});
+
+// ============== BÁO CÁO CHI TIẾT TRONG NGÀY ==============
+// Họ tên / SĐT / check-in / streak / total checked / total missed
+router.get('/reports/detailed', adminRequired, async (req, res, next) => {
+  try {
+    const t = nowInTimezone();
+    const date = req.query.date || t.date;
+    const todayWindowEnded = t.hour >= config.CHECKIN_END_HOUR;
+
+    // 1 query: lấy hết user + tất cả check_date của họ (sorted)
+    const r = await query(`
+      SELECT u.id, u.full_name, u.phone, u.email, u.username, u.created_at,
+             COALESCE(
+               ARRAY_AGG(c.check_date ORDER BY c.check_date DESC) FILTER (WHERE c.check_date IS NOT NULL),
+               '{}'::text[]
+             ) AS dates
+      FROM users u
+      LEFT JOIN check_ins c ON c.user_id = u.id
+      WHERE u.role != 'admin'
+      GROUP BY u.id
+      ORDER BY u.full_name
+    `);
+
+    const rows = r.rows.map(u => {
+      const dates = u.dates || [];
+      const datesSet = new Set(dates);
+      const checkedToday = datesSet.has(date);
+
+      // === STREAK: số ngày check-in liên tiếp ===
+      // Bắt đầu từ "hôm nay" (nếu đã check) hoặc "hôm qua" (nếu hôm nay chưa khả dụng) đi ngược
+      let cursor;
+      if (datesSet.has(date)) {
+        cursor = date;
+      } else if (!todayWindowEnded) {
+        // Hôm nay window chưa đóng - tính từ hôm qua (chưa kết thúc cơ hội)
+        cursor = addDays(date, -1);
+      } else {
+        // Hôm nay đã qua mà không check → streak = 0
+        cursor = null;
+      }
+      let streak = 0;
+      while (cursor && datesSet.has(cursor)) {
+        streak++;
+        cursor = addDays(cursor, -1);
+      }
+
+      // === TOTAL CHECKED + MISSED ===
+      // Eligible range: từ ngày user có thể check đến ngày cuối đã đóng window
+      const created = toLocalDateHour(u.created_at);
+      const firstMissable = created.hour < config.CHECKIN_START_HOUR
+        ? created.date
+        : addDays(created.date, 1);
+      const lastEnded = todayWindowEnded ? t.date : addDays(t.date, -1);
+
+      let totalMissed = 0;
+      if (firstMissable <= lastEnded) {
+        const eligibleDays = daysBetween(firstMissable, lastEnded);
+        const checkedInRange = dates.filter(d => d >= firstMissable && d <= lastEnded).length;
+        totalMissed = Math.max(0, eligibleDays - checkedInRange);
+      }
+
+      return {
+        full_name: u.full_name,
+        phone: u.phone,
+        email: u.email,
+        checked_today: checkedToday,
+        streak,
+        total_checked: dates.length,
+        total_missed: totalMissed
+      };
+    });
+
+    const checked = rows.filter(x => x.checked_today).length;
+
+    res.json({
+      date,
+      total: rows.length,
+      checked,
+      not_checked: rows.length - checked,
+      rows
     });
   } catch (err) { next(err); }
 });

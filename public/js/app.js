@@ -62,9 +62,10 @@ function pad(n) { return String(n).padStart(2, '0'); }
 const cachedUser = JSON.parse(localStorage.getItem('user') || '{}');
 document.getElementById('topbar-username').textContent = cachedUser.full_name || cachedUser.username || '';
 
-// Hiện tab Quản trị nếu là admin
+// Hiện tab Quản trị + Báo cáo nếu là admin
 if (cachedUser.role === 'admin') {
   document.getElementById('nav-admin').style.display = '';
+  document.getElementById('nav-reports').style.display = '';
 }
 document.getElementById('btn-logout').addEventListener('click', () => {
   localStorage.removeItem('token');
@@ -88,6 +89,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     if (target === 'checkin') renderCheckinTab();
     if (target === 'payment') initPaymentTab();
     if (target === 'admin') initAdminTab();
+    if (target === 'reports') initReportsTab();
   });
 });
 
@@ -882,6 +884,186 @@ function initAdminTab() {
   });
 
   loadAdminPayments();
+}
+
+// ============ REPORTS TAB (admin only) ============
+let reportsTabInitialized = false;
+let lastDailyReport = null;
+let lastDetailedReport = null;
+
+// Lazy load SheetJS từ CDN khi cần
+let sheetJSPromise = null;
+function loadSheetJS() {
+  if (sheetJSPromise) return sheetJSPromise;
+  sheetJSPromise = new Promise((resolve, reject) => {
+    if (window.XLSX) return resolve(window.XLSX);
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload = () => resolve(window.XLSX);
+    s.onerror = () => reject(new Error('Không tải được SheetJS'));
+    document.head.appendChild(s);
+  });
+  return sheetJSPromise;
+}
+
+async function exportToExcel(rows, sheetName, fileName, headers) {
+  if (!rows || !rows.length) {
+    alert('Không có dữ liệu để xuất');
+    return;
+  }
+  try {
+    const XLSX = await loadSheetJS();
+    // Tạo array of arrays với header tiếng Việt
+    const aoa = [headers.map(h => h.label)];
+    rows.forEach((r, i) => {
+      const row = [i + 1];
+      headers.slice(1).forEach(h => {
+        row.push(typeof h.value === 'function' ? h.value(r) : r[h.key]);
+      });
+      aoa.push(row);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    // Auto width cho từng cột
+    ws['!cols'] = headers.map(h => ({ wch: h.width || 15 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, fileName);
+  } catch (err) {
+    console.error(err);
+    alert('Lỗi xuất Excel: ' + err.message);
+  }
+}
+
+function todayDateString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+async function loadReportOverview() {
+  const r = await api('GET', '/api/admin/reports/overview');
+  if (!r || !r.ok) return;
+  document.getElementById('rep-total-users').textContent = r.data.total_users;
+  document.getElementById('rep-checked-today').textContent = r.data.checked_in_today;
+  document.getElementById('rep-not-checked-today').textContent = r.data.not_checked_today;
+  document.getElementById('rep-total-checkins').textContent = r.data.total_checkins_all_time;
+}
+
+async function loadReportDaily(date) {
+  const tbody = document.querySelector('#rep-daily-table tbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr>';
+  const r = await api('GET', `/api/admin/reports/daily?date=${date}`);
+  if (!r || !r.ok) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:#e74c3c;">${r?.data?.error || 'Lỗi'}</td></tr>`;
+    return;
+  }
+  lastDailyReport = r.data;
+  document.getElementById('rep-daily-summary').textContent =
+    `Ngày ${r.data.date} • ${r.data.total} user • ✓ ${r.data.checked} đã check-in • ✗ ${r.data.not_checked} chưa`;
+
+  if (r.data.rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#95a5a6;">Không có user nào</td></tr>';
+    return;
+  }
+  tbody.innerHTML = r.data.rows.map((row, i) => `
+    <tr>
+      <td class="num">${i+1}</td>
+      <td>${escapeText(row.full_name)}</td>
+      <td>${escapeText(row.phone)}</td>
+      <td>${escapeText(row.email)}</td>
+      <td class="${row.checked_in ? 'checked-yes' : 'checked-no'}">${row.checked_in ? '✓ Đã check-in' : '✗ Chưa'}</td>
+      <td class="num">${row.check_time || '—'}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadReportDetailed(date) {
+  const tbody = document.querySelector('#rep-detailed-table tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr>';
+  const r = await api('GET', `/api/admin/reports/detailed?date=${date}`);
+  if (!r || !r.ok) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#e74c3c;">${r?.data?.error || 'Lỗi'}</td></tr>`;
+    return;
+  }
+  lastDetailedReport = r.data;
+  if (r.data.rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#95a5a6;">Không có user nào</td></tr>';
+    return;
+  }
+  tbody.innerHTML = r.data.rows.map((row, i) => `
+    <tr>
+      <td class="num">${i+1}</td>
+      <td>${escapeText(row.full_name)}</td>
+      <td>${escapeText(row.phone)}</td>
+      <td class="${row.checked_today ? 'checked-yes' : 'checked-no'}">${row.checked_today ? '✓' : '✗'}</td>
+      <td class="num">${row.streak} ngày</td>
+      <td class="num">${row.total_checked}</td>
+      <td class="num">${row.total_missed}</td>
+    </tr>
+  `).join('');
+}
+
+async function reloadAllReports() {
+  const date = document.getElementById('rep-date').value || todayDateString();
+  await Promise.all([
+    loadReportOverview(),
+    loadReportDaily(date),
+    loadReportDetailed(date)
+  ]);
+}
+
+function initReportsTab() {
+  if (cachedUser.role !== 'admin') return;
+  if (reportsTabInitialized) {
+    reloadAllReports();
+    return;
+  }
+  reportsTabInitialized = true;
+
+  // Set date mặc định = hôm nay
+  document.getElementById('rep-date').value = todayDateString();
+
+  // Reload khi đổi ngày
+  document.getElementById('rep-date').addEventListener('change', reloadAllReports);
+  document.getElementById('rep-reload').addEventListener('click', reloadAllReports);
+
+  // Export Excel - báo cáo nhanh
+  document.getElementById('rep-daily-export').addEventListener('click', () => {
+    if (!lastDailyReport) return alert('Chưa có dữ liệu');
+    exportToExcel(
+      lastDailyReport.rows,
+      `Bao cao nhanh ${lastDailyReport.date}`,
+      `bao-cao-nhanh-${lastDailyReport.date}.xlsx`,
+      [
+        { key: '_', label: 'STT', width: 6 },
+        { key: 'full_name', label: 'Họ và tên', width: 28 },
+        { key: 'phone', label: 'Số điện thoại', width: 16 },
+        { key: 'email', label: 'Email', width: 30 },
+        { key: 'checked_in', label: 'Check-in', value: r => r.checked_in ? 'Đã check-in' : 'Chưa', width: 14 },
+        { key: 'check_time', label: 'Giờ', value: r => r.check_time || '', width: 10 }
+      ]
+    );
+  });
+
+  // Export Excel - báo cáo chi tiết
+  document.getElementById('rep-detailed-export').addEventListener('click', () => {
+    if (!lastDetailedReport) return alert('Chưa có dữ liệu');
+    exportToExcel(
+      lastDetailedReport.rows,
+      `Bao cao chi tiet ${lastDetailedReport.date}`,
+      `bao-cao-chi-tiet-${lastDetailedReport.date}.xlsx`,
+      [
+        { key: '_', label: 'STT', width: 6 },
+        { key: 'full_name', label: 'Họ và tên', width: 28 },
+        { key: 'phone', label: 'Số điện thoại', width: 16 },
+        { key: 'checked_today', label: 'Check-in hôm nay', value: r => r.checked_today ? 'Đã check-in' : 'Chưa', width: 18 },
+        { key: 'streak', label: 'Số ngày liên tiếp', width: 18 },
+        { key: 'total_checked', label: 'Tổng đã check-in', width: 18 },
+        { key: 'total_missed', label: 'Tổng chưa check-in', width: 20 }
+      ]
+    );
+  });
+
+  reloadAllReports();
 }
 
 // ============ INIT ============
