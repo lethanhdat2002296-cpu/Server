@@ -1,10 +1,20 @@
-// Dashboard chính
+// Dashboard chính - tối ưu: 1 API call, cache localStorage, render từ state
 
 const token = localStorage.getItem('token');
-if (!token) {
-  window.location.href = '/';
-}
+if (!token) window.location.href = '/';
 const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
+// ============ STATE ============
+let appState = {
+  user: null,
+  stats: null,
+  checkin: null,
+  history: null,
+  server_time: null,
+  fetched_at: 0
+};
+const CACHE_KEY = 'app_state_v1';
+const CACHE_TTL_MS = 60_000; // refresh ngầm sau 60s
 
 // ============ API HELPER ============
 async function api(method, url, body) {
@@ -16,6 +26,7 @@ async function api(method, url, body) {
   if (res.status === 401) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem(CACHE_KEY);
     window.location.href = '/';
     return;
   }
@@ -25,11 +36,11 @@ async function api(method, url, body) {
 // ============ COMMON ============
 function showMsg(elId, type, text) {
   const el = document.getElementById(elId);
+  if (!el) return;
   el.className = `message show ${type}`;
   el.textContent = text;
   if (type === 'success') setTimeout(() => { el.className = 'message'; }, 4000);
 }
-
 function showFieldError(input, msg) {
   const wrap = input.closest('.form-group');
   if (!wrap) return;
@@ -37,15 +48,12 @@ function showFieldError(input, msg) {
   if (msg) { input.classList.add('error'); if (errEl) errEl.textContent = msg; }
   else { input.classList.remove('error'); if (errEl) errEl.textContent = ''; }
 }
-
 function formatDateVi(dateStr) {
-  // dateStr: YYYY-MM-DD
   const [y, m, d] = dateStr.split('-');
   const date = new Date(+y, +m - 1, +d);
   const days = ['Chủ Nhật','Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'];
   return `${days[date.getDay()]}, ${d}/${m}/${y}`;
 }
-
 function pad(n) { return String(n).padStart(2, '0'); }
 
 // ============ TOPBAR ============
@@ -54,42 +62,88 @@ document.getElementById('topbar-username').textContent = cachedUser.full_name ||
 document.getElementById('btn-logout').addEventListener('click', () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+  localStorage.removeItem(CACHE_KEY);
   window.location.href = '/';
 });
 
 // ============ NAV ============
+// Chuyển tab chỉ đổi section, KHÔNG gọi API (dùng state đã cache)
 document.querySelectorAll('.nav-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     const target = tab.dataset.page;
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t === tab));
-    document.querySelectorAll('.page').forEach(p => {
-      p.classList.toggle('active', p.id === `page-${target}`);
-    });
-    if (target === 'home') loadStats();
-    if (target === 'checkin') { loadCheckinStatus(); loadHistory(true); }
-    if (target === 'history') loadHistory(false);
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `page-${target}`));
+
+    // Settings không nằm trong dashboard cache, vẫn load form khi vào
     if (target === 'settings') loadProfileForm();
+    // History full: render lại từ state (không gọi API)
+    if (target === 'history') renderHistory(false);
+    if (target === 'checkin') renderCheckinTab();
   });
 });
 
-// ============ HOME / STATS ============
-async function loadStats() {
-  const r = await api('GET', '/api/checkin/stats');
-  if (!r || !r.ok) return;
-  const { user, checked_this_month, missed_this_month, total_all_time } = r.data;
-  document.getElementById('home-fullname').textContent = user.full_name;
-  document.getElementById('stat-checked').textContent = checked_this_month;
-  document.getElementById('stat-missed').textContent = missed_this_month;
-  document.getElementById('stat-total').textContent = total_all_time;
-  document.getElementById('info-fullname').value = user.full_name;
-  document.getElementById('info-email').value = user.email;
-  document.getElementById('info-phone').value = user.phone;
-  document.getElementById('info-username').value = cachedUser.username || '';
+// ============ RENDER FROM STATE ============
+function renderHome() {
+  if (!appState.user || !appState.stats) return;
+  document.getElementById('home-fullname').textContent = appState.user.full_name;
+  document.getElementById('stat-checked').textContent = appState.stats.checked_this_month;
+  document.getElementById('stat-missed').textContent = appState.stats.missed_this_month;
+  document.getElementById('stat-total').textContent = appState.stats.total_all_time;
+  document.getElementById('info-fullname').value = appState.user.full_name;
+  document.getElementById('info-email').value = appState.user.email;
+  document.getElementById('info-phone').value = appState.user.phone;
+  document.getElementById('info-username').value = appState.user.username;
 }
 
-// ============ CHECK-IN ============
-let checkinState = null;
+function renderCheckinTab() {
+  if (!appState.checkin) return;
+  applyCheckinStatus(appState.checkin.status, appState.checkin.check_time);
+  renderHistory(true); // recent only
+}
 
+function renderHistory(recentOnly) {
+  if (!appState.history) return;
+  const listEl = document.getElementById(recentOnly ? 'checkin-recent-list' : 'history-list');
+  if (!listEl) return;
+
+  if (appState.history.length === 0) {
+    listEl.innerHTML = `<li class="empty-state">
+      <div class="ico">📅</div>
+      <div>Chưa có check-in nào</div>
+    </li>`;
+    return;
+  }
+
+  const slice = recentOnly ? appState.history.slice(0, 5) : appState.history;
+  listEl.innerHTML = slice.map(item => `
+    <li class="history-item">
+      <div>
+        <div class="history-date">${formatDateVi(item.check_date)}</div>
+        <div class="history-date-sub">${item.check_date}</div>
+      </div>
+      <div class="history-time">⏰ ${item.check_time.slice(0,5)}</div>
+    </li>
+  `).join('');
+}
+
+function renderAll() {
+  renderHome();
+  renderCheckinTab();
+  renderHistory(false);
+}
+
+// ============ SKELETON / LOADING UI ============
+function showSkeleton() {
+  // Hiển thị placeholder khi chưa có data
+  const skel = '<span class="skeleton" style="display:inline-block;width:30px;height:24px;background:#ecf0f1;border-radius:4px;"></span>';
+  ['stat-checked', 'stat-missed', 'stat-total'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.textContent === '0') el.innerHTML = skel;
+  });
+  document.getElementById('home-fullname').innerHTML = skel;
+}
+
+// ============ CHECK-IN BUTTON & CLOCK ============
 function updateClock() {
   const now = new Date();
   document.getElementById('checkin-clock').textContent =
@@ -105,7 +159,6 @@ function applyCheckinStatus(status, checkTime) {
   const icon = document.getElementById('checkin-icon');
   const label = document.getElementById('checkin-label');
   const msg = document.getElementById('checkin-msg');
-
   btn.classList.remove('active', 'done', 'missed', 'disabled');
 
   if (status === 'active') {
@@ -137,69 +190,97 @@ function applyCheckinStatus(status, checkTime) {
   }
 }
 
-async function loadCheckinStatus() {
-  const r = await api('GET', '/api/checkin/status');
-  if (!r || !r.ok) return;
-  checkinState = r.data;
-  applyCheckinStatus(r.data.status, r.data.check_time);
-}
-
-// Tự refresh trạng thái mỗi 30s khi đang ở tab check-in
-setInterval(() => {
-  if (document.getElementById('page-checkin').classList.contains('active')) {
-    loadCheckinStatus();
-  }
-}, 30000);
-
 document.getElementById('checkin-btn').addEventListener('click', async () => {
-  if (!checkinState || checkinState.status !== 'active') return;
+  if (!appState.checkin || appState.checkin.status !== 'active') return;
   const btn = document.getElementById('checkin-btn');
   btn.disabled = true;
   const r = await api('POST', '/api/checkin/check-in');
   if (r && r.ok) {
-    applyCheckinStatus('done', r.data.check_time);
-    loadHistory(true);
+    // Update state ngay - không cần gọi lại dashboard
+    appState.checkin = { status: 'done', check_time: r.data.check_time };
+    appState.history.unshift({ check_date: r.data.check_date, check_time: r.data.check_time });
+    appState.stats.checked_this_month++;
+    appState.stats.total_all_time++;
+    saveCache();
+    renderAll();
   } else {
     alert(r?.data?.error || 'Check-in thất bại');
     btn.disabled = false;
   }
 });
 
-// ============ HISTORY ============
-async function loadHistory(recentOnly) {
-  const r = await api('GET', '/api/checkin/history');
-  if (!r || !r.ok) return;
-  const items = r.data.history || [];
-  const listEl = document.getElementById(recentOnly ? 'checkin-recent-list' : 'history-list');
-  if (!listEl) return;
+// ============ BOOTSTRAP - tải data 1 lần ============
+function saveCache() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      ...appState,
+      fetched_at: Date.now()
+    }));
+  } catch (e) {}
+}
 
-  if (items.length === 0) {
-    listEl.innerHTML = `<li class="empty-state">
-      <div class="ico">📅</div>
-      <div>Chưa có check-in nào</div>
-    </li>`;
-    return;
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    Object.assign(appState, parsed);
+    return true;
+  } catch (e) { return false; }
+}
+
+async function fetchDashboard(silent = false) {
+  const r = await api('GET', '/api/checkin/dashboard');
+  if (!r || !r.ok) {
+    if (!silent) console.warn('Không tải được dashboard', r);
+    return false;
+  }
+  Object.assign(appState, r.data, { fetched_at: Date.now() });
+  saveCache();
+  renderAll();
+  return true;
+}
+
+async function bootstrap() {
+  // 1. Render từ cache localStorage NGAY (nếu có) → feel instant
+  const hadCache = loadCache();
+  if (hadCache) {
+    renderAll();
+  } else {
+    showSkeleton();
   }
 
-  const slice = recentOnly ? items.slice(0, 5) : items;
-  listEl.innerHTML = slice.map(item => `
-    <li class="history-item">
-      <div>
-        <div class="history-date">${formatDateVi(item.check_date)}</div>
-        <div class="history-date-sub">${item.check_date}</div>
-      </div>
-      <div class="history-time">⏰ ${item.check_time.slice(0,5)}</div>
-    </li>
-  `).join('');
+  // 2. Fetch fresh data (background nếu đã có cache)
+  await fetchDashboard(hadCache);
 }
+
+// Auto refresh background mỗi 60s khi tab active
+setInterval(() => {
+  if (document.visibilityState === 'visible') fetchDashboard(true);
+}, CACHE_TTL_MS);
+
+// Refresh khi user quay lại tab
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const age = Date.now() - (appState.fetched_at || 0);
+    if (age > 30_000) fetchDashboard(true);
+  }
+});
 
 // ============ SETTINGS - PROFILE ============
 async function loadProfileForm() {
-  const r = await api('GET', '/api/settings/me');
-  if (!r || !r.ok) return;
+  // Đầu tiên fill từ state (instant)
   const form = document.getElementById('profile-form');
-  form.full_name.value = r.data.user.full_name;
-  form.email.value = r.data.user.email;
+  if (appState.user) {
+    form.full_name.value = appState.user.full_name;
+    form.email.value = appState.user.email;
+  }
+  // Sau đó refresh từ /me (background) - đảm bảo data mới nhất
+  const r = await api('GET', '/api/settings/me');
+  if (r && r.ok) {
+    form.full_name.value = r.data.user.full_name;
+    form.email.value = r.data.user.email;
+  }
 }
 
 document.getElementById('profile-form').addEventListener('submit', async (e) => {
@@ -215,12 +296,17 @@ document.getElementById('profile-form').addEventListener('submit', async (e) => 
   const r = await api('PUT', '/api/settings/profile', data);
   if (r && r.ok) {
     showMsg('profile-msg', 'success', '✓ Cập nhật thành công');
-    // Cập nhật cache
+    // Update state + cache
+    if (appState.user) {
+      appState.user.full_name = data.full_name;
+      appState.user.email = data.email;
+      saveCache();
+    }
     cachedUser.full_name = data.full_name;
     cachedUser.email = data.email;
     localStorage.setItem('user', JSON.stringify(cachedUser));
     document.getElementById('topbar-username').textContent = data.full_name;
-    loadStats();
+    renderHome();
   } else {
     if (r?.data?.fields) {
       Object.entries(r.data.fields).forEach(([k, v]) => {
@@ -248,7 +334,6 @@ document.getElementById('btn-request-code').addEventListener('click', async (e) 
   btn.disabled = false;
 });
 
-// Toggle password visibility
 document.querySelectorAll('.toggle-pwd').forEach(btn => {
   btn.addEventListener('click', () => {
     const input = btn.previousElementSibling;
@@ -290,6 +375,4 @@ document.getElementById('password-form').addEventListener('submit', async (e) =>
 });
 
 // ============ INIT ============
-loadStats();
-loadCheckinStatus();
-loadHistory(true);
+bootstrap();

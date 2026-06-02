@@ -189,4 +189,71 @@ router.get('/stats', authRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ============== GET DASHBOARD (gộp tất cả data vào 1 endpoint) ==============
+// Endpoint này thay thế cho việc gọi /me + /stats + /status + /history riêng lẻ
+// Chạy 5 query song song với Promise.all để tối ưu cold start Vercel/Neon
+router.get('/dashboard', authRequired, async (req, res, next) => {
+  try {
+    const t = nowInTimezone();
+    const monthStr = t.date.slice(0, 7);
+    const monthStart = `${monthStr}-01`;
+    const userId = req.user.id;
+
+    // Chạy 5 query song song
+    const [userResRaw, todayCheckinRes, monthCheckedRes, historyRes, totalRes] = await Promise.all([
+      query('SELECT full_name, email, phone, username, created_at FROM users WHERE id = $1', [userId]),
+      query('SELECT check_time FROM check_ins WHERE user_id = $1 AND check_date = $2', [userId, t.date]),
+      query('SELECT COUNT(*)::int AS c FROM check_ins WHERE user_id = $1 AND check_date LIKE $2', [userId, `${monthStr}-%`]),
+      query('SELECT check_date, check_time FROM check_ins WHERE user_id = $1 ORDER BY check_date DESC, check_time DESC LIMIT 100', [userId]),
+      query('SELECT COUNT(*)::int AS c FROM check_ins WHERE user_id = $1', [userId])
+    ]);
+
+    const user = userResRaw.rows[0];
+    if (!user) return res.status(404).json({ error: 'Không tìm thấy người dùng' });
+
+    const todayRow = todayCheckinRes.rows[0];
+    const history = historyRes.rows;
+
+    // Trạng thái check-in hôm nay
+    const checkin = getCheckinStatusFromTime(t, !!todayRow, todayRow?.check_time);
+
+    // Tính missed (dựa trên ngày đăng ký user)
+    const createdLocal = toLocalDateHour(user.created_at);
+    const firstMissable = createdLocal.hour < config.CHECKIN_START_HOUR
+      ? createdLocal.date
+      : addDays(createdLocal.date, 1);
+    const lastEnded = t.hour >= config.CHECKIN_END_HOUR ? t.date : addDays(t.date, -1);
+    const startDate = firstMissable > monthStart ? firstMissable : monthStart;
+    const endDate = lastEnded;
+
+    let missedThisMonth = 0;
+    if (startDate <= endDate) {
+      const daysEligible = daysBetween(startDate, endDate);
+      // Lọc từ history đã fetch sẵn - không cần query thêm
+      const checkedInRange = history.filter(r =>
+        r.check_date >= startDate && r.check_date <= endDate
+      ).length;
+      missedThisMonth = Math.max(0, daysEligible - checkedInRange);
+    }
+
+    res.json({
+      user: {
+        full_name: user.full_name,
+        email: user.email,
+        phone: user.phone,
+        username: user.username
+      },
+      stats: {
+        month: monthStr,
+        checked_this_month: monthCheckedRes.rows[0].c,
+        missed_this_month: missedThisMonth,
+        total_all_time: totalRes.rows[0].c
+      },
+      checkin,
+      history,
+      server_time: `${t.date} ${t.time}`
+    });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

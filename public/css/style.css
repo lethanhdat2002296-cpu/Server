@@ -444,6 +444,25 @@ a { color: #0984e3; text-decoration: none; }
   .form-row { grid-template-columns: 1fr; }
 }
 
+/* ============ SKELETON LOADER ============ */
+.skeleton {
+  display: inline-block;
+  background: linear-gradient(90deg, #ecf0f1 0%, #f4f6f7 50%, #ecf0f1 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 4px;
+  color: transparent;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Fade-in mượt khi data hiển thị */
+.stat-value, .history-item, .form-group input {
+  transition: opacity 0.15s ease-in;
+}
+
 /* ============ MODAL ============ */
 .modal-overlay {
   position: fixed;
