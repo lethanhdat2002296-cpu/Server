@@ -493,9 +493,60 @@ a { color: #0984e3; text-decoration: none; }
   font-weight: 700;
   margin-left: 6px;
 }
-.badge.verified { background: #d4edda; color: #155724; }
+.badge.verified, .badge.confirmed { background: #d4edda; color: #155724; }
 .badge.pending { background: #fff3cd; color: #856404; }
 .badge.sent { background: #d1ecf1; color: #0c5460; }
+.badge.rejected { background: #f8d7da; color: #721c24; }
+
+/* Admin filter buttons */
+.filter-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  color: #2d3436;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.filter-btn:hover { background: #ecf0f1; }
+.filter-btn.active {
+  background: #e17055;
+  color: white;
+}
+.filter-btn.active .badge { background: rgba(255,255,255,0.3); color: white; }
+
+/* Admin payment item */
+.adm-pay-item {
+  border: 1px solid #ecf0f1;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  background: white;
+  transition: all 0.15s;
+}
+.adm-pay-item:hover { border-color: #e17055; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.adm-pay-info { flex: 1; min-width: 240px; }
+.adm-pay-name { font-weight: 700; font-size: 15px; margin-bottom: 3px; }
+.adm-pay-sub { font-size: 12px; color: #7f8c8d; line-height: 1.5; }
+.adm-pay-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.adm-pay-actions button {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.btn-confirm { background: #00b894; color: white; }
+.btn-confirm:hover { background: #00a07f; }
+.btn-confirm:disabled { background: #95a5a6; cursor: not-allowed; }
+.btn-reject { background: #f8d7da; color: #721c24; }
+.btn-reject:hover { background: #f1aeb5; }
 
 /* ============ SKELETON LOADER ============ */
 .skeleton {

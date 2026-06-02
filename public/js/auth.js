@@ -152,7 +152,10 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
     if (res.ok) {
       localStorage.setItem('token', data.token);
+      // data.user đã có role từ server
       localStorage.setItem('user', JSON.stringify(data.user));
+      // Xoá cache app state cũ để bootstrap fresh
+      localStorage.removeItem('app_state_v1');
       window.location.href = '/dashboard.html';
       return;
     }

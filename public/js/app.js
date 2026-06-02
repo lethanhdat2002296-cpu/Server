@@ -61,6 +61,11 @@ function pad(n) { return String(n).padStart(2, '0'); }
 // ============ TOPBAR ============
 const cachedUser = JSON.parse(localStorage.getItem('user') || '{}');
 document.getElementById('topbar-username').textContent = cachedUser.full_name || cachedUser.username || '';
+
+// Hiện tab Quản trị nếu là admin
+if (cachedUser.role === 'admin') {
+  document.getElementById('nav-admin').style.display = '';
+}
 document.getElementById('btn-logout').addEventListener('click', () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
@@ -82,6 +87,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     if (target === 'history') renderHistory(false);
     if (target === 'checkin') renderCheckinTab();
     if (target === 'payment') initPaymentTab();
+    if (target === 'admin') initAdminTab();
   });
 });
 
@@ -572,16 +578,21 @@ async function loadPaymentHistory() {
     return;
   }
   listEl.innerHTML = items.map(item => {
-    const verifiedBadge = item.is_receipt
-      ? '<span class="badge verified">✓ Đã xác minh</span>'
-      : '<span class="badge pending">⏳ Chờ xác minh</span>';
+    let statusBadge;
+    if (item.status === 'confirmed') statusBadge = '<span class="badge confirmed">✓ Đã xác nhận</span>';
+    else if (item.status === 'rejected') statusBadge = '<span class="badge rejected">✗ Bị từ chối</span>';
+    else statusBadge = '<span class="badge pending">⏳ Chờ xác nhận</span>';
     const sentBadge = item.email_sent ? '<span class="badge sent">📧 Đã gửi mail</span>' : '';
     const date = new Date(item.created_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const noteHtml = item.admin_note
+      ? `<div class="history-date-sub" style="margin-top:4px;font-style:italic;">💬 Admin: ${escapeText(item.admin_note)}</div>`
+      : '';
     return `<li class="history-item">
-      <div>
-        <div class="history-date">#${item.id} - ${item.full_name}${verifiedBadge}${sentBadge}</div>
-        <div class="history-date-sub">${date} • ${item.email} • ${item.phone}</div>
-        ${item.detected_banks ? `<div class="history-date-sub">Phát hiện: ${item.detected_banks}</div>` : ''}
+      <div style="width:100%;">
+        <div class="history-date">#${item.id} - ${escapeText(item.full_name)} ${statusBadge}${sentBadge}</div>
+        <div class="history-date-sub">${date} • ${escapeText(item.email)} • ${escapeText(item.phone)}</div>
+        ${item.detected_banks ? `<div class="history-date-sub">Phát hiện: ${escapeText(item.detected_banks)}</div>` : ''}
+        ${noteHtml}
       </div>
     </li>`;
   }).join('');
@@ -688,6 +699,189 @@ function initPaymentTab() {
 
   // Load history
   loadPaymentHistory();
+}
+
+// ============ ADMIN TAB ============
+let adminTabInitialized = false;
+let adminFilter = 'pending';
+
+function escapeText(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+async function loadAdminPayments() {
+  const listEl = document.getElementById('admin-payments-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>';
+
+  const r = await api('GET', `/api/admin/payments?status=${adminFilter}`);
+  if (!r || !r.ok) {
+    listEl.innerHTML = `<div class="empty-state"><div class="ico">⚠</div><div>${r?.data?.error || 'Không tải được'}</div></div>`;
+    return;
+  }
+
+  // Cập nhật counts
+  const counts = r.data.counts || {};
+  document.getElementById('cnt-pending').textContent = counts.pending || 0;
+  document.getElementById('cnt-confirmed').textContent = counts.confirmed || 0;
+  document.getElementById('cnt-rejected').textContent = counts.rejected || 0;
+
+  const items = r.data.payments || [];
+  if (items.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><div class="ico">📋</div><div>Không có thanh toán nào ở trạng thái này</div></div>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map(p => {
+    const date = new Date(p.created_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const isPending = p.status === 'pending';
+    let statusBadge;
+    if (p.status === 'confirmed') statusBadge = '<span class="badge confirmed">✓ Đã xác nhận</span>';
+    else if (p.status === 'rejected') statusBadge = '<span class="badge rejected">✗ Từ chối</span>';
+    else statusBadge = '<span class="badge pending">⏳ Chờ xác nhận</span>';
+    const verifiedBadge = p.is_receipt ? '<span class="badge sent">🤖 OCR pass</span>' : '';
+    const confirmedInfo = p.confirmed_at
+      ? `<div class="adm-pay-sub">✓ ${new Date(p.confirmed_at).toLocaleString('vi-VN', {timeZone:'Asia/Ho_Chi_Minh'})} bởi ${escapeText(p.confirmed_by_username || 'admin')}</div>`
+      : '';
+    const noteInfo = p.admin_note ? `<div class="adm-pay-sub" style="font-style:italic;">💬 ${escapeText(p.admin_note)}</div>` : '';
+
+    return `
+      <div class="adm-pay-item" data-payment-id="${p.id}">
+        <div class="adm-pay-info">
+          <div class="adm-pay-name">
+            #${p.id} - ${escapeText(p.full_name)} ${statusBadge} ${verifiedBadge}
+          </div>
+          <div class="adm-pay-sub">
+            👤 User: ${escapeText(p.username)} (${escapeText(p.user_full_name)})
+          </div>
+          <div class="adm-pay-sub">
+            📞 ${escapeText(p.phone)} • 📧 ${escapeText(p.email)}
+          </div>
+          <div class="adm-pay-sub">
+            🕐 ${date}
+            ${p.detected_banks ? ` • 🏦 ${escapeText(p.detected_banks)}` : ''}
+          </div>
+          ${confirmedInfo}
+          ${noteInfo}
+        </div>
+        <div class="adm-pay-actions">
+          ${isPending ? `
+            <button class="btn-confirm" data-action="confirm" data-id="${p.id}" data-name="${escapeText(p.full_name)}">✓ Xác nhận</button>
+            <button class="btn-reject" data-action="reject" data-id="${p.id}" data-name="${escapeText(p.full_name)}">✗ Từ chối</button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Bind buttons
+  listEl.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openAdminModal(btn.dataset.action, btn.dataset.id, btn.dataset.name);
+    });
+  });
+}
+
+function openAdminModal(action, paymentId, name) {
+  const modal = document.getElementById('admin-modal');
+  const title = document.getElementById('admin-modal-title');
+  const desc = document.getElementById('admin-modal-desc');
+  const note = document.getElementById('admin-modal-note');
+  const confirmBtn = document.getElementById('admin-modal-confirm');
+  const msg = document.getElementById('admin-modal-msg');
+
+  msg.className = 'message';
+  note.value = '';
+  modal.dataset.action = action;
+  modal.dataset.paymentId = paymentId;
+
+  if (action === 'confirm') {
+    title.textContent = `✓ Xác nhận thanh toán #${paymentId}`;
+    desc.textContent = `Email xác nhận sẽ được gửi đến user "${name}".`;
+    confirmBtn.textContent = 'Xác nhận';
+    confirmBtn.className = 'btn-primary';
+    note.placeholder = 'Vd: Đã đối chiếu với sao kê NH. Cảm ơn bạn!';
+  } else {
+    title.textContent = `✗ Từ chối thanh toán #${paymentId}`;
+    desc.textContent = `User "${name}" sẽ nhận email với lý do từ chối.`;
+    confirmBtn.textContent = 'Từ chối';
+    confirmBtn.className = 'btn-primary';
+    note.placeholder = 'Vd: Số tiền không khớp / Biên lai mờ / Chưa nhận được tiền';
+  }
+
+  modal.classList.add('show');
+}
+
+async function submitAdminAction() {
+  const modal = document.getElementById('admin-modal');
+  const action = modal.dataset.action;
+  const paymentId = modal.dataset.paymentId;
+  const note = document.getElementById('admin-modal-note').value.trim();
+  const confirmBtn = document.getElementById('admin-modal-confirm');
+  const msgEl = document.getElementById('admin-modal-msg');
+
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Đang xử lý...';
+  msgEl.className = 'message';
+
+  const r = await api('POST', `/api/admin/payments/${paymentId}/${action}`, { note });
+  if (r && r.ok) {
+    const sentMsg = r.data.email_sent
+      ? '✓ Email đã gửi thành công đến user'
+      : '⚠ Đã cập nhật nhưng KHÔNG gửi được email: ' + (r.data.email_error || '');
+    msgEl.className = 'message show success';
+    msgEl.textContent = sentMsg;
+    setTimeout(() => {
+      modal.classList.remove('show');
+      loadAdminPayments();
+    }, 1500);
+  } else {
+    msgEl.className = 'message show error';
+    msgEl.textContent = r?.data?.error || 'Lỗi không xác định';
+  }
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = action === 'confirm' ? 'Xác nhận' : 'Từ chối';
+}
+
+function initAdminTab() {
+  if (cachedUser.role !== 'admin') {
+    document.getElementById('admin-payments-list').innerHTML =
+      '<div class="empty-state"><div class="ico">🚫</div><div>Bạn không có quyền truy cập trang này</div></div>';
+    return;
+  }
+  if (adminTabInitialized) {
+    loadAdminPayments();
+    return;
+  }
+  adminTabInitialized = true;
+
+  // Filter buttons
+  document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      adminFilter = btn.dataset.filter;
+      loadAdminPayments();
+    });
+  });
+
+  document.getElementById('admin-refresh').addEventListener('click', loadAdminPayments);
+
+  // Modal
+  document.getElementById('admin-modal-cancel').addEventListener('click', () => {
+    document.getElementById('admin-modal').classList.remove('show');
+  });
+  document.getElementById('admin-modal-confirm').addEventListener('click', submitAdminAction);
+  document.getElementById('admin-modal').addEventListener('click', e => {
+    if (e.target.id === 'admin-modal') {
+      document.getElementById('admin-modal').classList.remove('show');
+    }
+  });
+
+  loadAdminPayments();
 }
 
 // ============ INIT ============

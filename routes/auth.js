@@ -124,7 +124,7 @@ router.post('/login', async (req, res, next) => {
     await query('DELETE FROM login_attempts WHERE username = $1', [uname]);
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, full_name: user.full_name },
+      { id: user.id, username: user.username, full_name: user.full_name, role: user.role || 'user' },
       config.JWT_SECRET,
       { expiresIn: config.JWT_EXPIRES_IN }
     );
@@ -137,7 +137,8 @@ router.post('/login', async (req, res, next) => {
         full_name: user.full_name,
         username: user.username,
         email: user.email,
-        phone: user.phone
+        phone: user.phone,
+        role: user.role || 'user'
       }
     });
   } catch (err) { next(err); }

@@ -96,13 +96,12 @@ router.post('/submit', authRequired, async (req, res, next) => {
     // Phân tích OCR text (đã chạy ở client)
     const analysis = analyzeReceiptText(ocr_text);
 
-    // Lưu DB - KHÔNG lưu image_data (tiết kiệm space Neon)
-    // Ảnh chỉ tồn tại tạm trong request rồi đi qua email
+    // Lưu DB với status='pending' (chờ admin xác nhận)
     const insertRes = await query(`
       INSERT INTO payments (
         user_id, full_name, phone, email,
-        ocr_text, is_receipt, detected_banks
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ocr_text, is_receipt, detected_banks, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
       RETURNING id, created_at
     `, [
       req.user.id,
@@ -156,7 +155,7 @@ router.get('/history', authRequired, async (req, res, next) => {
     res.set('Cache-Control', 'private, max-age=30');
     const r = await query(`
       SELECT id, full_name, phone, email, is_receipt, detected_banks,
-             email_sent, created_at
+             email_sent, status, confirmed_at, admin_note, created_at
       FROM payments
       WHERE user_id = $1
       ORDER BY created_at DESC

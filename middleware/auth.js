@@ -13,4 +13,15 @@ function authRequired(req, res, next) {
   }
 }
 
-module.exports = { authRequired };
+// Yêu cầu user phải đăng nhập VÀ có role=admin
+function adminRequired(req, res, next) {
+  authRequired(req, res, (err) => {
+    if (err) return next(err);
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Cần quyền Admin để truy cập' });
+    }
+    next();
+  });
+}
+
+module.exports = { authRequired, adminRequired };

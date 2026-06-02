@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "init-db": "node scripts/init-db.js"
+    "init-db": "node scripts/init-db.js",
+    "make-admin": "node scripts/make-admin.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
