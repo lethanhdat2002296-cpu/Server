@@ -14,7 +14,9 @@ let appState = {
   fetched_at: 0
 };
 const CACHE_KEY = 'app_state_v1';
-const CACHE_TTL_MS = 60_000; // refresh ngầm sau 60s
+const CACHE_TTL_MS = 60_000;     // refresh ngầm sau 60s
+const REFRESH_JITTER_MS = 30_000; // +0-30s random để tránh 100 user refresh đồng loạt
+const MIN_REFRESH_AGE_MS = 10_000; // không refresh nếu data mới fetch < 10s
 
 // ============ API HELPER ============
 async function api(method, url, body) {
@@ -229,16 +231,33 @@ function loadCache() {
   } catch (e) { return false; }
 }
 
+// Tránh nhiều request fetch đồng thời (debounce)
+let inFlightFetch = null;
 async function fetchDashboard(silent = false) {
-  const r = await api('GET', '/api/checkin/dashboard');
-  if (!r || !r.ok) {
-    if (!silent) console.warn('Không tải được dashboard', r);
-    return false;
+  // Nếu đang có request đang chạy thì dùng chung
+  if (inFlightFetch) return inFlightFetch;
+
+  // Bỏ qua nếu data mới fetch quá gần đây
+  if (silent && appState.fetched_at && (Date.now() - appState.fetched_at < MIN_REFRESH_AGE_MS)) {
+    return true;
   }
-  Object.assign(appState, r.data, { fetched_at: Date.now() });
-  saveCache();
-  renderAll();
-  return true;
+
+  inFlightFetch = (async () => {
+    try {
+      const r = await api('GET', '/api/checkin/dashboard');
+      if (!r || !r.ok) {
+        if (!silent) console.warn('Không tải được dashboard', r);
+        return false;
+      }
+      Object.assign(appState, r.data, { fetched_at: Date.now() });
+      saveCache();
+      renderAll();
+      return true;
+    } finally {
+      inFlightFetch = null;
+    }
+  })();
+  return inFlightFetch;
 }
 
 async function bootstrap() {
@@ -254,12 +273,20 @@ async function bootstrap() {
   await fetchDashboard(hadCache);
 }
 
-// Auto refresh background mỗi 60s khi tab active
-setInterval(() => {
-  if (document.visibilityState === 'visible') fetchDashboard(true);
-}, CACHE_TTL_MS);
+// Auto refresh background với JITTER (60-90s random)
+// → 100 user refresh dải trên 30s thay vì spike đồng loạt
+function scheduleNextRefresh() {
+  const delay = CACHE_TTL_MS + Math.random() * REFRESH_JITTER_MS;
+  setTimeout(async () => {
+    if (document.visibilityState === 'visible') {
+      await fetchDashboard(true);
+    }
+    scheduleNextRefresh();
+  }, delay);
+}
+scheduleNextRefresh();
 
-// Refresh khi user quay lại tab
+// Refresh khi user quay lại tab (chỉ nếu cache cũ > 30s)
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     const age = Date.now() - (appState.fetched_at || 0);

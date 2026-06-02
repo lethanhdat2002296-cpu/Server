@@ -69,6 +69,8 @@ function getCheckinStatusFromTime(t, hasCheckedIn, checkTime) {
 // ============== GET STATUS ==============
 router.get('/status', authRequired, async (req, res, next) => {
   try {
+    // Status thay đổi theo phút (lúc giáp 6:00 sáng), cache ngắn
+    res.set('Cache-Control', 'private, max-age=5');
     const t = nowInTimezone();
     const r = await query(
       'SELECT check_time FROM check_ins WHERE user_id = $1 AND check_date = $2',
@@ -112,6 +114,7 @@ router.post('/check-in', authRequired, async (req, res, next) => {
 // ============== LỊCH SỬ ==============
 router.get('/history', authRequired, async (req, res, next) => {
   try {
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
     const r = await query(`
       SELECT check_date, check_time
       FROM check_ins
@@ -194,6 +197,10 @@ router.get('/stats', authRequired, async (req, res, next) => {
 // Chạy 5 query song song với Promise.all để tối ưu cold start Vercel/Neon
 router.get('/dashboard', authRequired, async (req, res, next) => {
   try {
+    // Browser cache 15s + stale-while-revalidate 60s
+    // → Trong 15s đầu, browser KHÔNG hit server (instant)
+    // → 15-75s: serve cache cũ + refetch background (instant + fresh sau đó)
+    res.set('Cache-Control', 'private, max-age=15, stale-while-revalidate=60');
     const t = nowInTimezone();
     const monthStr = t.date.slice(0, 7);
     const monthStart = `${monthStr}-01`;

@@ -10,6 +10,7 @@ const router = express.Router();
 // ============== LẤY THÔNG TIN ==============
 router.get('/me', authRequired, async (req, res, next) => {
   try {
+    res.set('Cache-Control', 'private, max-age=30');
     const r = await query(
       'SELECT id, full_name, email, phone, username FROM users WHERE id = $1',
       [req.user.id]
