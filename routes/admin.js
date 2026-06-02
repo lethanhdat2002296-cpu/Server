@@ -208,12 +208,20 @@ router.get('/reports/overview', adminRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Validate date param: chỉ chấp nhận YYYY-MM-DD trong khoảng hợp lý
+function validateDateParam(input, fallback) {
+  if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input)) return fallback;
+  if (input < '2024-01-01' || input > fallback) return fallback;
+  return input;
+}
+
 // ============== BÁO CÁO NHANH TRONG NGÀY ==============
 // Họ tên / SĐT / check-in (hôm đó) + sum
 // Query param: date (mặc định hôm nay)
 router.get('/reports/daily', adminRequired, async (req, res, next) => {
   try {
-    const date = req.query.date || nowInTimezone().date;
+    const today = nowInTimezone().date;
+    const date = validateDateParam(req.query.date, today);
     const r = await query(`
       SELECT u.id, u.full_name, u.phone, u.email, u.username,
              c.check_time
@@ -247,7 +255,7 @@ router.get('/reports/daily', adminRequired, async (req, res, next) => {
 router.get('/reports/detailed', adminRequired, async (req, res, next) => {
   try {
     const t = nowInTimezone();
-    const date = req.query.date || t.date;
+    const date = validateDateParam(req.query.date, t.date);
     const todayWindowEnded = t.hour >= config.CHECKIN_END_HOUR;
 
     // 1 query: lấy hết user + tất cả check_date của họ (sorted)

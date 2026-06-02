@@ -274,7 +274,11 @@
       <div class="card" style="padding:14px 20px;">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
           <label style="font-weight:600;font-size:14px;">Chọn ngày:</label>
-          <input type="date" id="rep-date" style="padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
+          <input type="date" id="rep-date" min="2024-01-01" style="padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
+          <div style="display:flex;gap:6px;">
+            <button class="btn-secondary" data-quick="today" style="padding:8px 14px;width:auto;font-size:12px;">Hôm nay</button>
+            <button class="btn-secondary" data-quick="yesterday" style="padding:8px 14px;width:auto;font-size:12px;">Hôm qua</button>
+          </div>
           <button class="btn-secondary" id="rep-reload" style="max-width:120px;display:inline-block;width:auto;padding:8px 16px;">🔄 Reload</button>
         </div>
       </div>

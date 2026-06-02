@@ -1003,12 +1003,20 @@ async function loadReportDetailed(date) {
 }
 
 async function reloadAllReports() {
-  const date = document.getElementById('rep-date').value || todayDateString();
+  const date = validateReportDate(document.getElementById('rep-date').value);
   await Promise.all([
     loadReportOverview(),
     loadReportDaily(date),
     loadReportDetailed(date)
   ]);
+}
+
+// Validate date string YYYY-MM-DD trong khoảng hợp lệ (2024-01-01 đến hôm nay)
+function validateReportDate(v) {
+  const today = todayDateString();
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return today;
+  if (v < '2024-01-01' || v > today) return today;
+  return v;
 }
 
 function initReportsTab() {
@@ -1019,11 +1027,33 @@ function initReportsTab() {
   }
   reportsTabInitialized = true;
 
-  // Set date mặc định = hôm nay
-  document.getElementById('rep-date').value = todayDateString();
+  const dateInput = document.getElementById('rep-date');
+  const today = todayDateString();
 
-  // Reload khi đổi ngày
-  document.getElementById('rep-date').addEventListener('change', reloadAllReports);
+  // Set date mặc định = hôm nay, max = hôm nay (không cho chọn tương lai)
+  dateInput.value = today;
+  dateInput.max = today;
+
+  // Validate khi đổi ngày: nếu năm bị typo (vd 0025) → snap về hôm nay
+  dateInput.addEventListener('change', () => {
+    const normalized = validateReportDate(dateInput.value);
+    if (normalized !== dateInput.value) {
+      dateInput.value = normalized;
+      alert('Ngày không hợp lệ. Đã chuyển về hôm nay.');
+    }
+    reloadAllReports();
+  });
+
+  // Quick buttons: Hôm nay / Hôm qua
+  document.querySelectorAll('button[data-quick]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = new Date();
+      if (btn.dataset.quick === 'yesterday') t.setDate(t.getDate() - 1);
+      dateInput.value = `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`;
+      reloadAllReports();
+    });
+  });
+
   document.getElementById('rep-reload').addEventListener('click', reloadAllReports);
 
   // Export Excel - báo cáo nhanh
