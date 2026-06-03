@@ -1,11 +1,18 @@
 /* ============ RESET & BASE ============ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; }
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;   /* iOS không tự phóng to chữ khi xoay ngang */
+  text-size-adjust: 100%;
+}
 body {
+  min-height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: #f5f6fa;
   color: #2d3436;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;               /* chặn tràn ngang gây scroll ngang trên mobile */
 }
 button { font-family: inherit; cursor: pointer; border: none; background: none; }
 input { font-family: inherit; }
@@ -188,7 +195,11 @@ a { color: #0984e3; text-decoration: none; }
 .topbar {
   background: white;
   border-bottom: 1px solid #ecf0f1;
-  padding: 14px 24px;
+  padding: 14px clamp(14px, 3vw, 24px);
+  /* Chừa chỗ cho tai thỏ / thanh trạng thái trên iPhone */
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-left: max(clamp(14px, 3vw, 24px), env(safe-area-inset-left, 0px));
+  padding-right: max(clamp(14px, 3vw, 24px), env(safe-area-inset-right, 0px));
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -239,9 +250,15 @@ a { color: #0984e3; text-decoration: none; }
   display: flex;
   background: white;
   border-bottom: 1px solid #ecf0f1;
-  padding: 0 24px;
+  padding: 0 clamp(10px, 3vw, 24px);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;   /* cuộn mượt trên iOS */
+  scrollbar-width: none;               /* Firefox: ẩn thanh cuộn */
+  position: sticky;
+  top: 0;
+  z-index: 90;
 }
+.nav-tabs::-webkit-scrollbar { display: none; }  /* Chrome/Safari: ẩn thanh cuộn */
 .nav-tab {
   padding: 14px 20px;
   font-size: 14px;
@@ -255,9 +272,11 @@ a { color: #0984e3; text-decoration: none; }
 .nav-tab:hover:not(.active) { color: #2d3436; }
 
 .container {
+  width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px;
+  /* Padding co dãn mượt theo bề ngang màn hình */
+  padding: clamp(14px, 3vw, 28px);
 }
 .page {
   display: none;
@@ -649,18 +668,50 @@ a { color: #0984e3; text-decoration: none; }
   to { opacity: 1; transform: translateX(0); }
 }
 
-/* ============ MOBILE RESPONSIVE ============ */
+/* =====================================================================
+   RESPONSIVE - co dãn theo mọi thiết bị
+   - Màn hình lớn / iMac / monitor ≥ 1500px  → tận dụng chiều rộng
+   - Laptop 1024–1500px                       → mặc định (max 1100px)
+   - Tablet / iPad ≤ 1024px                   → bố cục gọn hơn
+   - Điện thoại ≤ 700px                        → stack dọc, nav cuộn ngang
+   - Điện thoại nhỏ ≤ 460px                    → 1 cột, chữ nhỏ hơn
+   ===================================================================== */
+
+/* ---------- MÀN HÌNH LỚN / MAC / MONITOR ---------- */
+@media (min-width: 1500px) {
+  .container { max-width: 1320px; }
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+}
+@media (min-width: 1920px) {
+  .container { max-width: 1500px; }
+  body { font-size: 17px; }
+  .page-title { font-size: 26px; }
+}
+
+/* ---------- TABLET / IPAD ---------- */
+@media (max-width: 1024px) {
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  .form-row { gap: 14px; }
+}
+
+/* ---------- ĐIỆN THOẠI ---------- */
 @media (max-width: 700px) {
-  .container { padding: 14px; }
-  .nav-tabs { padding: 0 10px; }
-  .nav-tab { padding: 12px 12px; font-size: 13px; }
-  .topbar { padding: 12px 14px; }
+  .nav-tab { padding: 12px 14px; font-size: 13px; }
   .topbar-brand span { display: none; }
   .user-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .page-title { font-size: 19px; }
+  .card { padding: 16px; border-radius: 12px; }
 
   /* Stat cards: 2 cột thay vì 1 hàng dài */
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .stat-value { font-size: 22px; }
+
+  /* Auth form gọn hơn */
+  .auth-form { padding: 22px 18px; }
+
+  /* Input ≥16px để iOS KHÔNG tự phóng to khi focus */
+  input, textarea, select { font-size: 16px; }
 
   /* Modal full width */
   .modal { max-width: 95% !important; margin: 10px; }
@@ -671,10 +722,16 @@ a { color: #0984e3; text-decoration: none; }
   .report-table { min-width: 0; font-size: 12px; }
   .report-table th, .report-table td { padding: 8px 8px; }
 
+  /* Form 2 cột → 1 cột */
+  .form-row { grid-template-columns: 1fr; }
+
   /* Admin payment item + user row: stack dọc */
   .adm-pay-item, .user-row { flex-direction: column; align-items: stretch; }
   .adm-pay-actions, .user-row-actions { width: 100%; }
   .adm-pay-actions button, .user-row-actions button { flex: 1; }
+
+  /* Nút bấm đủ lớn để chạm (≥ 44px) */
+  .btn-primary, .btn-secondary, .btn-logout { min-height: 44px; }
 
   /* Check-in button nhỏ lại */
   .checkin-btn { width: 180px; height: 180px; font-size: 18px; }
@@ -682,6 +739,40 @@ a { color: #0984e3; text-decoration: none; }
   .checkin-clock { font-size: 38px; }
 
   #toast-container { left: 12px; right: 12px; max-width: none; }
+}
+
+/* ---------- ĐIỆN THOẠI NHỎ (iPhone SE, < 460px) ---------- */
+@media (max-width: 460px) {
+  /* Stat cards: 1 cột cho dễ đọc */
+  .stats-grid { grid-template-columns: 1fr; }
+  .stat-value { font-size: 24px; }
+
+  .nav-tab { padding: 11px 12px; font-size: 12.5px; }
+  .page-title { font-size: 18px; }
+  .page-subtitle { font-size: 13px; }
+
+  /* Brand logo nhỏ lại */
+  .brand-logo { width: 56px; height: 56px; font-size: 18px; }
+  .brand h1 { font-size: 24px; }
+
+  /* Filter / subtab buttons full hàng */
+  .filter-btn, .subtab-btn, .range-quick { font-size: 12px; padding: 7px 10px; }
+
+  /* Check-in button vừa màn nhỏ */
+  .checkin-btn { width: 160px; height: 160px; }
+  .checkin-btn .ico { font-size: 34px; }
+  .checkin-clock { font-size: 32px; }
+
+  /* Sub-tab + filter cho cuộn ngang nếu chật */
+  .subtab-panel .filter-btn { white-space: nowrap; }
+}
+
+/* ---------- MÀN HÌNH NGANG THẤP (điện thoại xoay ngang) ---------- */
+@media (max-height: 480px) and (orientation: landscape) {
+  .checkin-btn { width: 130px; height: 130px; }
+  .checkin-btn .ico { font-size: 28px; margin-bottom: 2px; }
+  .checkin-clock { font-size: 28px; }
+  .checkin-section { padding: 14px; }
 }
 
 /* ============ SKELETON LOADER ============ */
