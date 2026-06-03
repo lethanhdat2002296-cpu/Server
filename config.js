@@ -2,9 +2,21 @@
 // Khi chạy local: load .env qua dotenv (trong server.js)
 // Khi chạy Vercel: env vars được set trong Vercel Project Settings
 
+// JWT_SECRET: bắt buộc set thật trong production
+const DEFAULT_JWT_SECRET = 'dev-secret-doi-thanh-cua-may-trong-env';
+const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+if (isProduction) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET bắt buộc phải set trong production. Vào Vercel → Settings → Environment Variables.');
+  }
+  if (process.env.JWT_SECRET === DEFAULT_JWT_SECRET) {
+    throw new Error('JWT_SECRET đang dùng giá trị mặc định trong production. Đổi sang chuỗi random 32+ ký tự.');
+  }
+}
+
 module.exports = {
   PORT: parseInt(process.env.PORT || '3000', 10),
-  JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-doi-thanh-cua-may-trong-env',
+  JWT_SECRET: process.env.JWT_SECRET || DEFAULT_JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
 
   // Khung giờ check-in (24h)

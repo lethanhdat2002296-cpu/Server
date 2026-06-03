@@ -9,10 +9,12 @@ function validatePhone(phone) {
 
 function validateEmail(email) {
   if (!email) return 'Email không được để trống';
+  // Local part: không cho bắt đầu/kết thúc bằng dấu chấm, không cho 2 chấm liên tiếp
   const allowedDomains = ['gmail.com', `${config.COMPANY_DOMAIN}.com`];
-  const re = new RegExp(`^[a-zA-Z0-9._%+-]+@(${allowedDomains.join('|').replace(/\./g, '\\.')})$`);
+  const domainPattern = allowedDomains.join('|').replace(/\./g, '\\.');
+  const re = new RegExp(`^[a-zA-Z0-9_%+-]+(\\.[a-zA-Z0-9_%+-]+)*@(${domainPattern})$`);
   if (!re.test(email)) {
-    return `Email phải kết thúc bằng @gmail.com hoặc @${config.COMPANY_DOMAIN}.com`;
+    return `Email phải kết thúc bằng @gmail.com hoặc @${config.COMPANY_DOMAIN}.com (không chứa dấu chấm liên tiếp)`;
   }
   return null;
 }

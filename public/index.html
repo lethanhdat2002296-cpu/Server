@@ -35,8 +35,62 @@
           </div>
           <div class="field-error"></div>
         </div>
+        <div style="text-align:right;margin-bottom:10px;">
+          <a href="#" id="forgot-link" style="font-size:13px;color:#e17055;font-weight:600;">Quên mật khẩu?</a>
+        </div>
         <div id="login-message" class="message"></div>
         <button type="submit" class="btn-primary">Đăng nhập</button>
+      </form>
+
+      <!-- FORGOT PASSWORD FORM -->
+      <form id="forgot-form" class="auth-form">
+        <div id="forgot-step-1">
+          <p style="font-size:13px;color:#7f8c8d;margin-bottom:14px;">
+            Nhập tên đăng nhập, email hoặc số điện thoại đã đăng ký. Hệ thống sẽ gửi mã xác nhận đến email.
+          </p>
+          <div class="form-group">
+            <label>Tên đăng nhập / Email / SĐT *</label>
+            <input type="text" name="identifier" required>
+            <div class="field-error"></div>
+          </div>
+          <div id="forgot-message-1" class="message"></div>
+          <button type="button" id="forgot-send-code" class="btn-primary">Gửi mã xác nhận</button>
+        </div>
+
+        <div id="forgot-step-2" style="display:none;">
+          <p style="font-size:13px;color:#7f8c8d;margin-bottom:14px;">
+            Mã xác nhận đã gửi đến <strong id="forgot-masked-email"></strong>. Hiệu lực 10 phút.
+          </p>
+          <div class="form-group">
+            <label>Mã xác nhận (8 chữ số) *</label>
+            <input type="text" name="code" maxlength="8" required style="letter-spacing:4px;font-family:monospace;font-size:16px;text-align:center;">
+            <div class="field-error"></div>
+          </div>
+          <div class="form-group">
+            <label>Mật khẩu mới *</label>
+            <div class="password-wrap">
+              <input type="password" name="new_password" required>
+              <button type="button" class="toggle-pwd" tabindex="-1">👁</button>
+            </div>
+            <div class="field-hint">8+ ký tự, có IN HOA, thường, số, ký tự đặc biệt</div>
+            <div class="field-error"></div>
+          </div>
+          <div class="form-group">
+            <label>Nhập lại mật khẩu *</label>
+            <div class="password-wrap">
+              <input type="password" name="confirm_password" required>
+              <button type="button" class="toggle-pwd" tabindex="-1">👁</button>
+            </div>
+            <div class="field-error"></div>
+          </div>
+          <div id="forgot-message-2" class="message"></div>
+          <button type="submit" class="btn-primary">Đặt mật khẩu mới</button>
+          <button type="button" id="forgot-resend" class="btn-secondary" style="margin-top:8px;">Gửi lại mã</button>
+        </div>
+
+        <div style="text-align:center;margin-top:14px;">
+          <a href="#" id="back-to-login" style="font-size:13px;color:#7f8c8d;">← Quay lại đăng nhập</a>
+        </div>
       </form>
 
       <!-- REGISTER FORM -->

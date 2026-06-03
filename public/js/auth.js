@@ -81,6 +81,128 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
+// ============ FORGOT PASSWORD ============
+function showForgotForm() {
+  document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+  document.getElementById('forgot-form').classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('forgot-step-1').style.display = '';
+  document.getElementById('forgot-step-2').style.display = 'none';
+  hideMsg('forgot-message-1');
+  hideMsg('forgot-message-2');
+}
+
+function backToLogin() {
+  document.querySelector('.tab[data-tab="login"]').click();
+}
+
+document.getElementById('forgot-link').addEventListener('click', e => {
+  e.preventDefault();
+  showForgotForm();
+});
+document.getElementById('back-to-login').addEventListener('click', e => {
+  e.preventDefault();
+  backToLogin();
+});
+
+let forgotIdentifier = '';
+
+async function sendForgotCode() {
+  const form = document.getElementById('forgot-form');
+  const identifier = form.identifier.value.trim();
+  if (!identifier) {
+    showFieldError(form.identifier, 'Vui lòng nhập thông tin');
+    return;
+  }
+  forgotIdentifier = identifier;
+  hideMsg('forgot-message-1');
+  const btn = document.getElementById('forgot-send-code');
+  btn.disabled = true;
+  btn.textContent = 'Đang gửi...';
+
+  try {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      document.getElementById('forgot-masked-email').textContent = data.masked_email;
+      document.getElementById('forgot-step-1').style.display = 'none';
+      document.getElementById('forgot-step-2').style.display = '';
+      if (data.dev_mode) {
+        showMsg('forgot-message-2', 'info', '⚙ DEV mode: mã được log ở console server.');
+      }
+    } else {
+      showMsg('forgot-message-1', 'error', data.error || 'Lỗi gửi mã');
+    }
+  } catch (err) {
+    showMsg('forgot-message-1', 'error', 'Không thể kết nối máy chủ');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Gửi mã xác nhận';
+  }
+}
+
+document.getElementById('forgot-send-code').addEventListener('click', sendForgotCode);
+document.getElementById('forgot-resend').addEventListener('click', () => {
+  document.getElementById('forgot-step-1').style.display = '';
+  document.getElementById('forgot-step-2').style.display = 'none';
+  hideMsg('forgot-message-2');
+});
+
+document.getElementById('forgot-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const form = e.target;
+  form.querySelectorAll('input').forEach(i => showFieldError(i, null));
+  hideMsg('forgot-message-2');
+
+  const code = form.code.value.trim();
+  const new_password = form.new_password.value;
+  const confirm_password = form.confirm_password.value;
+
+  if (!code) return showFieldError(form.code, 'Vui lòng nhập mã');
+  const pwdErr = validators.password(new_password);
+  if (pwdErr) return showFieldError(form.new_password, pwdErr);
+  if (new_password !== confirm_password) {
+    return showFieldError(form.confirm_password, 'Mật khẩu nhập lại không khớp');
+  }
+
+  const btn = form.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.textContent = 'Đang xử lý...';
+
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: forgotIdentifier, code, new_password, confirm_password })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showMsg('forgot-message-2', 'success', '✓ Đổi mật khẩu thành công! Đang chuyển về đăng nhập...');
+      setTimeout(() => {
+        backToLogin();
+        document.getElementById('login-form').username.value = data.username || forgotIdentifier;
+        document.getElementById('login-form').password.value = '';
+      }, 1800);
+    } else {
+      if (data.fields) {
+        Object.entries(data.fields).forEach(([k, v]) => {
+          if (form[k]) showFieldError(form[k], v);
+        });
+      }
+      showMsg('forgot-message-2', 'error', data.error || 'Lỗi đặt mật khẩu');
+    }
+  } catch (err) {
+    showMsg('forgot-message-2', 'error', 'Không thể kết nối máy chủ');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Đặt mật khẩu mới';
+  }
+});
+
 // ============ TOGGLE PASSWORD ============
 document.querySelectorAll('.toggle-pwd').forEach(btn => {
   btn.addEventListener('click', () => {

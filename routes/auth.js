@@ -3,13 +3,54 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../lib/db');
 const config = require('../config');
-const { validateRegister } = require('../utils/validators');
+const { validateRegister, validatePassword } = require('../utils/validators');
+const { sendResetCode } = require('../utils/email');
 
 const router = express.Router();
+
+// Lấy IP client (Vercel đặt qua x-forwarded-for)
+function getClientIp(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  if (fwd) return String(fwd).split(',')[0].trim();
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+// Rate limit đăng ký: tối đa 5 lần / IP / giờ
+const REGISTER_LIMIT = 5;
+const REGISTER_WINDOW_MS = 60 * 60 * 1000;
+async function checkRegisterRateLimit(ip) {
+  const now = Date.now();
+  const r = await query('SELECT * FROM register_attempts WHERE ip = $1', [ip]);
+  const row = r.rows[0];
+  if (!row || now - Number(row.window_start) > REGISTER_WINDOW_MS) {
+    // Cửa sổ mới
+    await query(`
+      INSERT INTO register_attempts (ip, count, window_start)
+      VALUES ($1, 1, $2)
+      ON CONFLICT (ip) DO UPDATE SET count = 1, window_start = $2
+    `, [ip, now]);
+    return { allowed: true };
+  }
+  if (row.count >= REGISTER_LIMIT) {
+    const retryMin = Math.ceil((REGISTER_WINDOW_MS - (now - Number(row.window_start))) / 60000);
+    return { allowed: false, retryMin };
+  }
+  await query('UPDATE register_attempts SET count = count + 1 WHERE ip = $1', [ip]);
+  return { allowed: true };
+}
 
 // ============== ĐĂNG KÝ ==============
 router.post('/register', async (req, res, next) => {
   try {
+    // Rate limit theo IP
+    const ip = getClientIp(req);
+    const rl = await checkRegisterRateLimit(ip);
+    if (!rl.allowed) {
+      return res.status(429).json({
+        error: `Bạn đã đăng ký quá nhiều lần. Vui lòng thử lại sau ${rl.retryMin} phút.`
+      });
+    }
+
     const data = req.body || {};
     const errors = validateRegister(data);
     if (Object.keys(errors).length) {
@@ -82,8 +123,8 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
-    // Tìm user
-    const userRes = await query('SELECT * FROM users WHERE username = $1', [uname]);
+    // Tìm user (loại trừ user đã bị soft-delete)
+    const userRes = await query('SELECT * FROM users WHERE username = $1 AND deleted_at IS NULL', [uname]);
     const user = userRes.rows[0];
     if (!user) {
       return res.status(404).json({
@@ -140,6 +181,107 @@ router.post('/login', async (req, res, next) => {
         phone: user.phone,
         role: user.role || 'user'
       }
+    });
+  } catch (err) { next(err); }
+});
+
+// ============== FORGOT PASSWORD - Bước 1: gửi mã ==============
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { identifier } = req.body || {};
+    if (!identifier || !identifier.trim()) {
+      return res.status(400).json({ error: 'Vui lòng nhập tên đăng nhập, email hoặc số điện thoại' });
+    }
+    const id = identifier.toLowerCase().trim();
+
+    // Tìm user theo username / email / phone
+    const r = await query(
+      `SELECT * FROM users WHERE (username = $1 OR email = $1 OR phone = $1) AND deleted_at IS NULL`,
+      [id]
+    );
+    const user = r.rows[0];
+    if (!user) {
+      return res.status(404).json({ error: 'Không tìm thấy tài khoản với thông tin này' });
+    }
+
+    // Tạo mã 8 chữ số (tăng entropy từ 1M lên 100M)
+    const code = String(Math.floor(10000000 + Math.random() * 90000000));
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+
+    // Vô hiệu hóa mã cũ
+    await query('UPDATE reset_codes SET used = 1 WHERE user_id = $1 AND used = 0', [user.id]);
+    await query(
+      'INSERT INTO reset_codes (user_id, code, expires_at) VALUES ($1, $2, $3)',
+      [user.id, code, expiresAt]
+    );
+
+    try {
+      const result = await sendResetCode(user.email, code, user.full_name);
+      // Mask email để user xác nhận đúng tài khoản
+      const masked = user.email.replace(/^(.{1,2}).*(@.*)$/, '$1***$2');
+      return res.json({
+        ok: true,
+        message: `Mã xác nhận đã được gửi đến ${masked}`,
+        masked_email: masked,
+        dev_mode: result.dev || false
+      });
+    } catch (mailErr) {
+      console.error('Lỗi gửi email forgot-password:', mailErr);
+      return res.status(500).json({ error: 'Không gửi được email. Vui lòng thử lại sau' });
+    }
+  } catch (err) { next(err); }
+});
+
+// ============== FORGOT PASSWORD - Bước 2: reset bằng mã ==============
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { identifier, code, new_password, confirm_password } = req.body || {};
+    if (!identifier || !code) {
+      return res.status(400).json({ error: 'Thiếu thông tin xác nhận' });
+    }
+    const pwdErr = validatePassword(new_password);
+    if (pwdErr) {
+      return res.status(400).json({ error: pwdErr, fields: { new_password: pwdErr } });
+    }
+    if (new_password !== confirm_password) {
+      return res.status(400).json({
+        error: 'Mật khẩu nhập lại không khớp',
+        fields: { confirm_password: 'Mật khẩu nhập lại không khớp' }
+      });
+    }
+
+    const id = identifier.toLowerCase().trim();
+    const userRes = await query(
+      `SELECT * FROM users WHERE (username = $1 OR email = $1 OR phone = $1) AND deleted_at IS NULL`,
+      [id]
+    );
+    const user = userRes.rows[0];
+    if (!user) return res.status(404).json({ error: 'Không tìm thấy tài khoản' });
+
+    // Verify code
+    const codeRes = await query(`
+      SELECT * FROM reset_codes
+      WHERE user_id = $1 AND code = $2 AND used = 0
+      ORDER BY id DESC LIMIT 1
+    `, [user.id, code.trim()]);
+    const row = codeRes.rows[0];
+    if (!row) return res.status(400).json({ error: 'Mã xác nhận không đúng' });
+    if (Number(row.expires_at) < Date.now()) {
+      return res.status(400).json({ error: 'Mã xác nhận đã hết hạn. Vui lòng yêu cầu mã mới' });
+    }
+
+    // Update password
+    const hash = await bcrypt.hash(new_password, 10);
+    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
+    await query('UPDATE reset_codes SET used = 1 WHERE id = $1', [row.id]);
+
+    // Reset login_attempts (trong trường hợp user đang bị khóa)
+    await query('DELETE FROM login_attempts WHERE username = $1', [user.username]);
+
+    res.json({
+      ok: true,
+      message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập.',
+      username: user.username
     });
   } catch (err) { next(err); }
 });

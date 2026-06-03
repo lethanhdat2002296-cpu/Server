@@ -706,6 +706,9 @@ function initPaymentTab() {
 // ============ ADMIN TAB ============
 let adminTabInitialized = false;
 let adminFilter = 'pending';
+let adminSearch = '';
+let adminPage = 0;
+const ADMIN_PAGE_SIZE = 20;
 
 function escapeText(s) {
   if (s == null) return '';
@@ -719,13 +722,14 @@ async function loadAdminPayments() {
   if (!listEl) return;
   listEl.innerHTML = '<div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>';
 
-  const r = await api('GET', `/api/admin/payments?status=${adminFilter}`);
+  const offset = adminPage * ADMIN_PAGE_SIZE;
+  const qs = `status=${adminFilter}&search=${encodeURIComponent(adminSearch)}&limit=${ADMIN_PAGE_SIZE}&offset=${offset}`;
+  const r = await api('GET', `/api/admin/payments?${qs}`);
   if (!r || !r.ok) {
     listEl.innerHTML = `<div class="empty-state"><div class="ico">⚠</div><div>${r?.data?.error || 'Không tải được'}</div></div>`;
     return;
   }
 
-  // Cập nhật counts
   const counts = r.data.counts || {};
   document.getElementById('cnt-pending').textContent = counts.pending || 0;
   document.getElementById('cnt-confirmed').textContent = counts.confirmed || 0;
@@ -733,7 +737,8 @@ async function loadAdminPayments() {
 
   const items = r.data.payments || [];
   if (items.length === 0) {
-    listEl.innerHTML = `<div class="empty-state"><div class="ico">📋</div><div>Không có thanh toán nào ở trạng thái này</div></div>`;
+    listEl.innerHTML = `<div class="empty-state"><div class="ico">📋</div><div>${adminSearch ? 'Không tìm thấy kết quả' : 'Không có thanh toán nào'}</div></div>`;
+    renderPagination('admin-pagination', r.data.total || 0, adminPage, ADMIN_PAGE_SIZE, p => { adminPage = p; loadAdminPayments(); });
     return;
   }
 
@@ -745,6 +750,9 @@ async function loadAdminPayments() {
     else if (p.status === 'rejected') statusBadge = '<span class="badge rejected">✗ Từ chối</span>';
     else statusBadge = '<span class="badge pending">⏳ Chờ xác nhận</span>';
     const verifiedBadge = p.is_receipt ? '<span class="badge sent">🤖 OCR pass</span>' : '';
+    // Badge email lỗi + nút gửi lại (cho payment đã xử lý mà email chưa gửi được)
+    const emailFailBadge = (!isPending && p.email_sent === false)
+      ? '<span class="badge rejected">📧 Email lỗi</span>' : '';
     const confirmedInfo = p.confirmed_at
       ? `<div class="adm-pay-sub">✓ ${new Date(p.confirmed_at).toLocaleString('vi-VN', {timeZone:'Asia/Ho_Chi_Minh'})} bởi ${escapeText(p.confirmed_by_username || 'admin')}</div>`
       : '';
@@ -754,18 +762,11 @@ async function loadAdminPayments() {
       <div class="adm-pay-item" data-payment-id="${p.id}">
         <div class="adm-pay-info">
           <div class="adm-pay-name">
-            #${p.id} - ${escapeText(p.full_name)} ${statusBadge} ${verifiedBadge}
+            #${p.id} - ${escapeText(p.full_name)} ${statusBadge} ${verifiedBadge} ${emailFailBadge}
           </div>
-          <div class="adm-pay-sub">
-            👤 User: ${escapeText(p.username)} (${escapeText(p.user_full_name)})
-          </div>
-          <div class="adm-pay-sub">
-            📞 ${escapeText(p.phone)} • 📧 ${escapeText(p.email)}
-          </div>
-          <div class="adm-pay-sub">
-            🕐 ${date}
-            ${p.detected_banks ? ` • 🏦 ${escapeText(p.detected_banks)}` : ''}
-          </div>
+          <div class="adm-pay-sub">👤 User: ${escapeText(p.username)} (${escapeText(p.user_full_name)})</div>
+          <div class="adm-pay-sub">📞 ${escapeText(p.phone)} • 📧 ${escapeText(p.email)}</div>
+          <div class="adm-pay-sub">🕐 ${date}${p.detected_banks ? ` • 🏦 ${escapeText(p.detected_banks)}` : ''}</div>
           ${confirmedInfo}
           ${noteInfo}
         </div>
@@ -774,16 +775,49 @@ async function loadAdminPayments() {
             <button class="btn-confirm" data-action="confirm" data-id="${p.id}" data-name="${escapeText(p.full_name)}">✓ Xác nhận</button>
             <button class="btn-reject" data-action="reject" data-id="${p.id}" data-name="${escapeText(p.full_name)}">✗ Từ chối</button>
           ` : ''}
+          ${(!isPending && p.email_sent === false) ? `
+            <button class="btn-reject" data-action="resend" data-id="${p.id}">📧 Gửi lại email</button>
+          ` : ''}
         </div>
       </div>
     `;
   }).join('');
 
-  // Bind buttons
-  listEl.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      openAdminModal(btn.dataset.action, btn.dataset.id, btn.dataset.name);
+  // Bind confirm/reject buttons
+  listEl.querySelectorAll('button[data-action="confirm"], button[data-action="reject"]').forEach(btn => {
+    btn.addEventListener('click', () => openAdminModal(btn.dataset.action, btn.dataset.id, btn.dataset.name));
+  });
+  // Bind resend buttons
+  listEl.querySelectorAll('button[data-action="resend"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = 'Đang gửi...';
+      const rr = await api('POST', `/api/admin/payments/${btn.dataset.id}/resend-email`);
+      if (rr && rr.ok && rr.data.email_sent) {
+        showToast('success', 'Gửi lại email', 'Email đã gửi thành công');
+        loadAdminPayments();
+      } else {
+        showToast('error', 'Gửi email thất bại', rr?.data?.email_error || 'Lỗi SMTP');
+        btn.disabled = false; btn.textContent = '📧 Gửi lại email';
+      }
     });
+  });
+
+  renderPagination('admin-pagination', r.data.total || 0, adminPage, ADMIN_PAGE_SIZE, p => { adminPage = p; loadAdminPayments(); });
+}
+
+// Pagination generic: container, total, currentPage(0-based), pageSize, onGo(page)
+function renderPagination(containerId, total, page, pageSize, onGo) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <button class="page-btn" ${page <= 0 ? 'disabled' : ''} data-go="${page - 1}">← Trước</button>
+    <span style="font-size:13px;color:#7f8c8d;">Trang ${page + 1}/${totalPages} • ${total} bản ghi</span>
+    <button class="page-btn" ${page >= totalPages - 1 ? 'disabled' : ''} data-go="${page + 1}">Sau →</button>
+  `;
+  el.querySelectorAll('button[data-go]').forEach(b => {
+    b.addEventListener('click', () => { if (!b.disabled) onGo(parseInt(b.dataset.go, 10)); });
   });
 }
 
@@ -848,6 +882,132 @@ async function submitAdminAction() {
   confirmBtn.textContent = action === 'confirm' ? 'Xác nhận' : 'Từ chối';
 }
 
+// ===== USER MANAGEMENT =====
+let usersSearch = '';
+let usersPage = 0;
+const USERS_PAGE_SIZE = 20;
+
+async function loadAdminUsers() {
+  const listEl = document.getElementById('admin-users-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>';
+
+  const offset = usersPage * USERS_PAGE_SIZE;
+  const qs = `search=${encodeURIComponent(usersSearch)}&limit=${USERS_PAGE_SIZE}&offset=${offset}`;
+  const r = await api('GET', `/api/admin/users?${qs}`);
+  if (!r || !r.ok) {
+    listEl.innerHTML = `<div class="empty-state"><div class="ico">⚠</div><div>${r?.data?.error || 'Lỗi'}</div></div>`;
+    return;
+  }
+  const users = r.data.users || [];
+  if (users.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><div class="ico">👥</div><div>${usersSearch ? 'Không tìm thấy' : 'Chưa có user'}</div></div>`;
+    renderPagination('users-pagination', r.data.total || 0, usersPage, USERS_PAGE_SIZE, p => { usersPage = p; loadAdminUsers(); });
+    return;
+  }
+  listEl.innerHTML = users.map(u => {
+    const created = new Date(u.created_at).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const rolePill = u.role === 'admin'
+      ? '<span class="role-pill admin">ADMIN</span>'
+      : '<span class="role-pill user">USER</span>';
+    const isSelf = u.id === cachedUser.id;
+    return `
+      <div class="user-row">
+        <div class="user-row-info">
+          <div class="user-row-name">${escapeText(u.full_name)} ${rolePill} ${isSelf ? '<span style="font-size:11px;color:#e17055;">(bạn)</span>' : ''}</div>
+          <div class="user-row-sub">@${escapeText(u.username)} • 📞 ${escapeText(u.phone)} • 📧 ${escapeText(u.email)}</div>
+          <div class="user-row-sub">📅 Tham gia ${created} • ✓ ${u.total_checkins} check-in${u.last_checkin ? ` • Gần nhất: ${u.last_checkin}` : ''}</div>
+        </div>
+        <div class="user-row-actions">
+          <button class="btn-secondary" data-uaction="view" data-id="${u.id}">👁 Xem</button>
+          ${!isSelf ? (u.role === 'admin'
+            ? `<button class="btn-secondary" data-uaction="demote" data-id="${u.id}" data-name="${escapeText(u.full_name)}">⬇ Gỡ admin</button>`
+            : `<button class="btn-secondary" data-uaction="promote" data-id="${u.id}" data-name="${escapeText(u.full_name)}">⬆ Cấp admin</button>`) : ''}
+          ${!isSelf ? `<button class="btn-reject" data-uaction="delete" data-id="${u.id}" data-name="${escapeText(u.full_name)}">🗑 Xóa</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('button[data-uaction]').forEach(btn => {
+    btn.addEventListener('click', () => handleUserAction(btn.dataset.uaction, btn.dataset.id, btn.dataset.name));
+  });
+  renderPagination('users-pagination', r.data.total || 0, usersPage, USERS_PAGE_SIZE, p => { usersPage = p; loadAdminUsers(); });
+}
+
+async function handleUserAction(action, userId, name) {
+  if (action === 'view') {
+    const r = await api('GET', `/api/admin/users/${userId}/checkins`);
+    if (!r || !r.ok) return showToast('error', 'Lỗi', r?.data?.error || '');
+    const u = r.data.user;
+    const checks = r.data.checkins || [];
+    const list = checks.length
+      ? checks.map(c => `${c.check_date} (${c.check_time.slice(0,5)})`).join('<br>')
+      : 'Chưa có check-in nào';
+    openInfoModal(`Check-in của ${escapeText(u.full_name)}`,
+      `<div style="font-size:13px;color:#7f8c8d;margin-bottom:10px;">@${escapeText(u.username)} • ${escapeText(u.phone)} • Tổng ${checks.length} check-in</div>
+       <div style="max-height:300px;overflow-y:auto;font-size:13px;line-height:1.8;">${list}</div>`);
+    return;
+  }
+  if (action === 'promote' || action === 'demote') {
+    const role = action === 'promote' ? 'admin' : 'user';
+    if (!confirm(`${action === 'promote' ? 'Cấp quyền admin cho' : 'Gỡ quyền admin của'} "${name}"?`)) return;
+    const r = await api('POST', `/api/admin/users/${userId}/role`, { role });
+    if (r && r.ok) { showToast('success', 'Đổi quyền', r.data.message); loadAdminUsers(); }
+    else showToast('error', 'Lỗi', r?.data?.error || '');
+    return;
+  }
+  if (action === 'delete') {
+    if (!confirm(`Xóa user "${name}"? Toàn bộ check-in/thanh toán của họ sẽ ẩn khỏi báo cáo.`)) return;
+    const r = await api('DELETE', `/api/admin/users/${userId}`);
+    if (r && r.ok) { showToast('success', 'Đã xóa', r.data.message); loadAdminUsers(); }
+    else showToast('error', 'Lỗi', r?.data?.error || '');
+    return;
+  }
+}
+
+// ===== AUDIT LOG =====
+async function loadAuditLog() {
+  const listEl = document.getElementById('admin-audit-list');
+  if (!listEl) return;
+  const r = await api('GET', '/api/admin/audit-log');
+  if (!r || !r.ok) { listEl.innerHTML = '<li class="empty-state"><div>Lỗi tải nhật ký</div></li>'; return; }
+  const logs = r.data.logs || [];
+  if (logs.length === 0) { listEl.innerHTML = '<li class="empty-state"><div class="ico">📜</div><div>Chưa có hoạt động</div></li>'; return; }
+  const actionLabel = {
+    confirm_payment: '✓ Xác nhận TT', reject_payment: '✗ Từ chối TT',
+    resend_email: '📧 Gửi lại email', change_role: '🔑 Đổi quyền', delete_user: '🗑 Xóa user'
+  };
+  listEl.innerHTML = logs.map(l => {
+    const t = new Date(l.created_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    return `<li class="history-item">
+      <div>
+        <div class="history-date">${actionLabel[l.action] || escapeText(l.action)} • ${escapeText(l.target || '')}</div>
+        <div class="history-date-sub">${escapeText(l.admin_name)} • ${t}${l.note ? ' • ' + escapeText(l.note) : ''}</div>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+// Info modal đơn giản (tái dùng admin-modal markup không tiện → tạo modal động)
+function openInfoModal(title, bodyHtml) {
+  let modal = document.getElementById('info-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'info-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `<div class="modal"><div class="modal-title" id="info-modal-title"></div>
+      <div id="info-modal-body" style="margin:12px 0;"></div>
+      <div class="modal-actions"><button class="btn-primary" id="info-modal-close">Đóng</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target.id === 'info-modal') modal.classList.remove('show'); });
+    modal.querySelector('#info-modal-close').addEventListener('click', () => modal.classList.remove('show'));
+  }
+  modal.querySelector('#info-modal-title').textContent = title;
+  modal.querySelector('#info-modal-body').innerHTML = bodyHtml;
+  modal.classList.add('show');
+}
+
 function initAdminTab() {
   if (cachedUser.role !== 'admin') {
     document.getElementById('admin-payments-list').innerHTML =
@@ -860,27 +1020,52 @@ function initAdminTab() {
   }
   adminTabInitialized = true;
 
-  // Filter buttons
+  // Sub-tab switching
+  document.querySelectorAll('.subtab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.subtab;
+      document.querySelectorAll('.subtab-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.subtab-panel').forEach(p => p.classList.toggle('active', p.id === `subtab-${target}`));
+      if (target === 'users') loadAdminUsers();
+      if (target === 'audit') loadAuditLog();
+      if (target === 'payments') loadAdminPayments();
+    });
+  });
+
+  // Payment filter buttons
   document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       adminFilter = btn.dataset.filter;
+      adminPage = 0;
       loadAdminPayments();
     });
   });
 
-  document.getElementById('admin-refresh').addEventListener('click', loadAdminPayments);
+  // Payment search (debounce)
+  let searchTimer = null;
+  document.getElementById('admin-search').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { adminSearch = e.target.value.trim(); adminPage = 0; loadAdminPayments(); }, 400);
+  });
+  document.getElementById('admin-refresh').addEventListener('click', () => { adminPage = 0; loadAdminPayments(); });
 
-  // Modal
+  // Users search
+  let usersTimer = null;
+  document.getElementById('users-search').addEventListener('input', e => {
+    clearTimeout(usersTimer);
+    usersTimer = setTimeout(() => { usersSearch = e.target.value.trim(); usersPage = 0; loadAdminUsers(); }, 400);
+  });
+  document.getElementById('users-refresh').addEventListener('click', () => { usersPage = 0; loadAdminUsers(); });
+
+  // Modal confirm/reject
   document.getElementById('admin-modal-cancel').addEventListener('click', () => {
     document.getElementById('admin-modal').classList.remove('show');
   });
   document.getElementById('admin-modal-confirm').addEventListener('click', submitAdminAction);
   document.getElementById('admin-modal').addEventListener('click', e => {
-    if (e.target.id === 'admin-modal') {
-      document.getElementById('admin-modal').classList.remove('show');
-    }
+    if (e.target.id === 'admin-modal') document.getElementById('admin-modal').classList.remove('show');
   });
 
   loadAdminPayments();
@@ -1093,8 +1278,166 @@ function initReportsTab() {
     );
   });
 
+  // ===== Range report (tuần/tháng) + biểu đồ =====
+  document.querySelectorAll('.range-quick').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.range-quick').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const r = computeRange(btn.dataset.range);
+      document.getElementById('rep-range-from').value = r.from;
+      document.getElementById('rep-range-to').value = r.to;
+      loadRangeReport(r.from, r.to);
+    });
+  });
+  document.getElementById('rep-range-apply').addEventListener('click', () => {
+    document.querySelectorAll('.range-quick').forEach(b => b.classList.remove('active'));
+    const from = validateReportDate(document.getElementById('rep-range-from').value);
+    const to = validateReportDate(document.getElementById('rep-range-to').value);
+    loadRangeReport(from, to);
+  });
+  document.getElementById('rep-range-export').addEventListener('click', () => {
+    if (!lastRangeReport) return alert('Chưa có dữ liệu');
+    exportToExcel(
+      lastRangeReport.per_user,
+      `Xu huong ${lastRangeReport.from} ${lastRangeReport.to}`,
+      `xu-huong-${lastRangeReport.from}_${lastRangeReport.to}.xlsx`,
+      [
+        { key: '_', label: 'STT', width: 6 },
+        { key: 'full_name', label: 'Họ và tên', width: 28 },
+        { key: 'phone', label: 'Số điện thoại', width: 16 },
+        { key: 'email', label: 'Email', width: 30 },
+        { key: 'checked_days', label: `Số ngày check-in (${lastRangeReport.total_days} ngày)`, width: 26 }
+      ]
+    );
+  });
+
+  // Mặc định load 7 ngày
+  const wk = computeRange('week');
+  document.getElementById('rep-range-from').value = wk.from;
+  document.getElementById('rep-range-to').value = wk.to;
+  document.getElementById('rep-range-from').max = todayDateString();
+  document.getElementById('rep-range-to').max = todayDateString();
+
   reloadAllReports();
+  loadRangeReport(wk.from, wk.to);
 }
+
+// Tính khoảng ngày cho quick buttons
+function computeRange(type) {
+  const d = new Date();
+  const to = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  let from;
+  if (type === 'month') {
+    from = `${d.getFullYear()}-${pad(d.getMonth()+1)}-01`;
+  } else if (type === '30days') {
+    const s = new Date(d); s.setDate(s.getDate() - 29);
+    from = `${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`;
+  } else { // week = 7 ngày
+    const s = new Date(d); s.setDate(s.getDate() - 6);
+    from = `${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`;
+  }
+  return { from, to };
+}
+
+let lastRangeReport = null;
+let chartInstance = null;
+let chartJSPromise = null;
+function loadChartJS() {
+  if (chartJSPromise) return chartJSPromise;
+  chartJSPromise = new Promise((resolve, reject) => {
+    if (window.Chart) return resolve(window.Chart);
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+    s.onload = () => resolve(window.Chart);
+    s.onerror = () => reject(new Error('Không tải được Chart.js'));
+    document.head.appendChild(s);
+  });
+  return chartJSPromise;
+}
+
+async function loadRangeReport(from, to) {
+  const r = await api('GET', `/api/admin/reports/range?from=${from}&to=${to}`);
+  if (!r || !r.ok) { showToast('error', 'Lỗi', r?.data?.error || 'Không tải được'); return; }
+  lastRangeReport = r.data;
+  document.getElementById('rep-range-summary').textContent =
+    `${r.data.from} → ${r.data.to} • ${r.data.total_days} ngày • ${r.data.total_checkins} lượt check-in • ${r.data.total_users} user`;
+
+  try {
+    const Chart = await loadChartJS();
+    const labels = r.data.daily.map(d => d.date.slice(5)); // MM-DD
+    const data = r.data.daily.map(d => d.count);
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(document.getElementById('rep-chart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Số lượt check-in',
+          data,
+          backgroundColor: 'rgba(225,112,85,0.7)',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// ============ TOAST ============
+function showToast(type, title, body) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast ${type || ''}`;
+  el.innerHTML = `<div class="toast-title">${escapeText(title)}</div>${body ? `<div class="toast-body">${escapeText(body)}</div>` : ''}`;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.3s';
+    setTimeout(() => el.remove(), 300);
+  }, 5000);
+}
+
+// ============ POLLING: thông báo khi payment đổi trạng thái ============
+// So sánh trạng thái payment với snapshot trước, toast nếu admin vừa xác nhận/từ chối
+let paymentStatusSnapshot = null;
+async function pollPaymentStatus() {
+  if (cachedUser.role === 'admin') return; // admin không cần
+  const r = await api('GET', '/api/payment/history');
+  if (!r || !r.ok) return;
+  const items = r.data.history || [];
+  const current = {};
+  items.forEach(p => { current[p.id] = p.status; });
+
+  if (paymentStatusSnapshot) {
+    items.forEach(p => {
+      const prev = paymentStatusSnapshot[p.id];
+      if (prev && prev !== p.status && p.status !== 'pending') {
+        if (p.status === 'confirmed') {
+          showToast('success', '✓ Thanh toán đã được xác nhận', `Biên lai #${p.id} của bạn đã được duyệt!`);
+        } else if (p.status === 'rejected') {
+          showToast('error', '✗ Thanh toán bị từ chối', `Biên lai #${p.id}: ${p.admin_note || 'Liên hệ admin'}`);
+        }
+        // Cập nhật tab payment nếu đang mở
+        if (typeof loadPaymentHistory === 'function') loadPaymentHistory();
+      }
+    });
+  }
+  paymentStatusSnapshot = current;
+}
+// Poll mỗi 45s khi tab visible (jitter nhẹ)
+setInterval(() => {
+  if (document.visibilityState === 'visible') pollPaymentStatus();
+}, 45000 + Math.random() * 10000);
 
 // ============ INIT ============
 bootstrap();
+// Khởi tạo snapshot payment sau 3s (đợi bootstrap xong)
+setTimeout(() => { if (cachedUser.role !== 'admin') pollPaymentStatus(); }, 3000);

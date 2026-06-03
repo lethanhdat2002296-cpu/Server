@@ -574,6 +574,116 @@ a { color: #0984e3; text-decoration: none; }
 .report-table .checked-yes { color: #00b894; font-weight: 700; }
 .report-table .checked-no { color: #d63031; font-weight: 700; }
 
+/* ============ SUB-TABS (admin) ============ */
+.subtab-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  color: #2d3436;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.subtab-btn:hover { background: #ecf0f1; }
+.subtab-btn.active { background: #e17055; color: white; }
+.subtab-panel { display: none; }
+.subtab-panel.active { display: block; }
+
+/* Pagination */
+.page-btn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2d3436;
+}
+.page-btn:hover:not(:disabled) { background: #e17055; color: white; }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* User row */
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #ecf0f1;
+  flex-wrap: wrap;
+}
+.user-row:last-child { border-bottom: none; }
+.user-row-info { flex: 1; min-width: 220px; }
+.user-row-name { font-weight: 700; font-size: 14px; }
+.user-row-sub { font-size: 12px; color: #7f8c8d; line-height: 1.5; }
+.user-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.user-row-actions button { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+.role-pill { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+.role-pill.admin { background:#e3f2fd; color:#0d47a1; }
+.role-pill.user { background:#f0f0f0; color:#666; }
+
+/* ============ TOAST ============ */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 340px;
+}
+.toast {
+  background: white;
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  border-left: 4px solid #e17055;
+  animation: toastIn 0.3s ease;
+  font-size: 14px;
+}
+.toast.success { border-left-color: #00b894; }
+.toast.error { border-left-color: #d63031; }
+.toast-title { font-weight: 700; margin-bottom: 3px; }
+.toast-body { font-size: 13px; color: #555; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ============ MOBILE RESPONSIVE ============ */
+@media (max-width: 700px) {
+  .container { padding: 14px; }
+  .nav-tabs { padding: 0 10px; }
+  .nav-tab { padding: 12px 12px; font-size: 13px; }
+  .topbar { padding: 12px 14px; }
+  .topbar-brand span { display: none; }
+  .user-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Stat cards: 2 cột thay vì 1 hàng dài */
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-value { font-size: 22px; }
+
+  /* Modal full width */
+  .modal { max-width: 95% !important; margin: 10px; }
+
+  /* Report table: ẩn cột email (đỡ tràn) */
+  #rep-daily-table th:nth-child(4),
+  #rep-daily-table td:nth-child(4) { display: none; }
+  .report-table { min-width: 0; font-size: 12px; }
+  .report-table th, .report-table td { padding: 8px 8px; }
+
+  /* Admin payment item + user row: stack dọc */
+  .adm-pay-item, .user-row { flex-direction: column; align-items: stretch; }
+  .adm-pay-actions, .user-row-actions { width: 100%; }
+  .adm-pay-actions button, .user-row-actions button { flex: 1; }
+
+  /* Check-in button nhỏ lại */
+  .checkin-btn { width: 180px; height: 180px; font-size: 18px; }
+  .checkin-btn .ico { font-size: 40px; }
+  .checkin-clock { font-size: 38px; }
+
+  #toast-container { left: 12px; right: 12px; max-width: none; }
+}
+
 /* ============ SKELETON LOADER ============ */
 .skeleton {
   display: inline-block;

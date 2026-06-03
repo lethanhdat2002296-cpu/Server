@@ -192,36 +192,79 @@
     <!-- ============ QUẢN TRỊ (chỉ admin) ============ -->
     <section id="page-admin" class="page">
       <div class="page-header">
-        <div class="page-title">Quản trị thanh toán</div>
-        <div class="page-subtitle">Xác nhận hoặc từ chối biên lai từ người dùng</div>
+        <div class="page-title">Quản trị</div>
+        <div class="page-subtitle">Duyệt thanh toán, quản lý người dùng, nhật ký hệ thống</div>
       </div>
 
-      <!-- Filter tabs -->
-      <div class="card" style="padding:14px 20px;margin-bottom:14px;">
+      <!-- Sub-tabs -->
+      <div class="card" style="padding:10px 14px;margin-bottom:14px;">
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="filter-btn active" data-filter="pending">
-            ⏳ Chờ xác nhận <span class="badge pending" id="cnt-pending">0</span>
-          </button>
-          <button class="filter-btn" data-filter="confirmed">
-            ✓ Đã xác nhận <span class="badge verified" id="cnt-confirmed">0</span>
-          </button>
-          <button class="filter-btn" data-filter="rejected">
-            ✗ Từ chối <span class="badge rejected" id="cnt-rejected">0</span>
-          </button>
-          <button class="filter-btn" data-filter="all">Tất cả</button>
-          <button class="filter-btn" id="admin-refresh" style="margin-left:auto;">🔄 Refresh</button>
+          <button class="subtab-btn active" data-subtab="payments">💳 Thanh toán</button>
+          <button class="subtab-btn" data-subtab="users">👥 Người dùng</button>
+          <button class="subtab-btn" data-subtab="audit">📜 Nhật ký</button>
         </div>
       </div>
 
-      <div class="card">
-        <div id="admin-payments-list">
-          <div class="empty-state">
-            <div class="ico">⏳</div>
-            <div>Đang tải...</div>
+      <!-- SUB: THANH TOÁN -->
+      <div id="subtab-payments" class="subtab-panel active">
+        <div class="card" style="padding:14px 20px;margin-bottom:14px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="filter-btn active" data-filter="pending">
+              ⏳ Chờ xác nhận <span class="badge pending" id="cnt-pending">0</span>
+            </button>
+            <button class="filter-btn" data-filter="confirmed">
+              ✓ Đã xác nhận <span class="badge verified" id="cnt-confirmed">0</span>
+            </button>
+            <button class="filter-btn" data-filter="rejected">
+              ✗ Từ chối <span class="badge rejected" id="cnt-rejected">0</span>
+            </button>
+            <button class="filter-btn" data-filter="all">Tất cả</button>
           </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <input type="text" id="admin-search" placeholder="🔍 Tìm theo tên / SĐT / email / username..."
+                   style="flex:1;padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
+            <button class="btn-secondary" id="admin-refresh" style="width:auto;padding:8px 16px;">🔄</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div id="admin-payments-list">
+            <div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>
+          </div>
+          <div id="admin-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;"></div>
+        </div>
+      </div>
+
+      <!-- SUB: NGƯỜI DÙNG -->
+      <div id="subtab-users" class="subtab-panel">
+        <div class="card" style="padding:14px 20px;margin-bottom:14px;">
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="users-search" placeholder="🔍 Tìm user theo tên / SĐT / email..."
+                   style="flex:1;padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
+            <button class="btn-secondary" id="users-refresh" style="width:auto;padding:8px 16px;">🔄</button>
+          </div>
+        </div>
+        <div class="card">
+          <div id="admin-users-list">
+            <div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>
+          </div>
+          <div id="users-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;"></div>
+        </div>
+      </div>
+
+      <!-- SUB: NHẬT KÝ -->
+      <div id="subtab-audit" class="subtab-panel">
+        <div class="card">
+          <div class="card-title">Nhật ký hành động admin</div>
+          <ul class="history-list" id="admin-audit-list">
+            <li class="empty-state"><div class="ico">📜</div><div>Đang tải...</div></li>
+          </ul>
         </div>
       </div>
     </section>
+
+    <!-- Modal xác nhận / từ chối -->
+    <!-- (giữ nguyên modal cũ bên dưới) -->
 
     <!-- Modal xác nhận / từ chối -->
     <div class="modal-overlay" id="admin-modal">
@@ -230,7 +273,8 @@
         <div class="modal-desc" id="admin-modal-desc"></div>
         <div class="form-group">
           <label>Ghi chú (sẽ gửi kèm email cho user)</label>
-          <textarea id="admin-modal-note" rows="3" style="width:100%;padding:10px;border:1.5px solid #dfe6e9;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+          <textarea id="admin-modal-note" rows="3" maxlength="500" style="width:100%;padding:10px;border:1.5px solid #dfe6e9;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+          <div style="font-size:11px;color:#95a5a6;text-align:right;margin-top:4px;">Tối đa 500 ký tự</div>
         </div>
         <div id="admin-modal-msg" class="message"></div>
         <div class="modal-actions">
@@ -339,6 +383,32 @@
           </table>
         </div>
       </div>
+
+      <!-- 4. BÁO CÁO THEO KHOẢNG (tuần/tháng) + BIỂU ĐỒ -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div class="card-title" style="margin-bottom:4px;">📊 Xu hướng check-in (tuần / tháng)</div>
+            <div style="font-size:13px;color:#7f8c8d;" id="rep-range-summary">Chọn khoảng thời gian</div>
+          </div>
+          <button class="btn-primary" id="rep-range-export" style="max-width:180px;padding:8px 16px;">📥 Xuất Excel</button>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+          <button class="btn-secondary range-quick active" data-range="week" style="width:auto;padding:8px 16px;font-size:13px;">7 ngày</button>
+          <button class="btn-secondary range-quick" data-range="month" style="width:auto;padding:8px 16px;font-size:13px;">Tháng này</button>
+          <button class="btn-secondary range-quick" data-range="30days" style="width:auto;padding:8px 16px;font-size:13px;">30 ngày</button>
+          <span style="font-size:13px;color:#7f8c8d;">hoặc</span>
+          <input type="date" id="rep-range-from" min="2024-01-01" style="padding:7px 10px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
+          <span style="font-size:13px;">→</span>
+          <input type="date" id="rep-range-to" min="2024-01-01" style="padding:7px 10px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
+          <button class="btn-secondary" id="rep-range-apply" style="width:auto;padding:8px 16px;font-size:13px;">Áp dụng</button>
+        </div>
+
+        <div style="position:relative;height:280px;">
+          <canvas id="rep-chart"></canvas>
+        </div>
+      </div>
     </section>
 
     <!-- ============ CÀI ĐẶT ============ -->
@@ -409,6 +479,8 @@
     </section>
 
   </div>
+
+  <div id="toast-container"></div>
 
   <script src="/js/app.js"></script>
 </body>
