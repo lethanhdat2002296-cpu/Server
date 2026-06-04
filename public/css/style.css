@@ -488,7 +488,7 @@ a { color: #0984e3; text-decoration: none; }
 .suggest-item:last-child { border-bottom: none; }
 .suggest-item:hover, .suggest-item.active { background: #fff5f0; }
 .suggest-item .si-name { font-weight: 600; }
-.suggest-item .si-hint { font-size: 12px; color: #95a5a6; margin-left: 6px; }
+.suggest-item .si-hint { font-size: 12px; color: #95a5a6; margin-top: 2px; }
 
 /* ============ DROP ZONE (file upload) ============ */
 .drop-zone {

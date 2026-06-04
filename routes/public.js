@@ -15,6 +15,24 @@ async function lookupLimit(req, res, next) {
   next();
 }
 
+// Che giữa SĐT: hiện 4 số đầu + 2 số cuối (vd 0905***02) để phân biệt mà không lộ hết
+function maskPhone(p) {
+  if (!p) return '';
+  const s = String(p);
+  if (s.length <= 4) return s;
+  if (s.length <= 6) return s.slice(0, 3) + '***';
+  return s.slice(0, 4) + '***' + s.slice(-2);
+}
+// Che giữa email: hiện 3 ký tự đầu phần tên + tên miền (vd led***@gmail.com)
+function maskEmail(e) {
+  if (!e) return '';
+  const at = e.indexOf('@');
+  if (at < 0) return e.slice(0, 3) + '***';
+  const local = e.slice(0, at), domain = e.slice(at);
+  const shown = local.slice(0, Math.min(3, local.length));
+  return shown + '***' + domain;
+}
+
 // ============== GỢI Ý TÊN (autocomplete) ==============
 // GET /api/public/members/search?q=...
 router.get('/members/search', lookupLimit, async (req, res, next) => {
@@ -23,17 +41,18 @@ router.get('/members/search', lookupLimit, async (req, res, next) => {
     if (q.length < 1) return res.json({ members: [] });
     res.set('Cache-Control', 'no-store');
     const r = await query(`
-      SELECT id, full_name, phone
+      SELECT id, full_name, phone, email
       FROM members
       WHERE LOWER(full_name) LIKE $1
       ORDER BY full_name
       LIMIT 8
     `, [`%${q}%`]);
-    // Mask phone (chỉ hiện 3 số cuối) để phân biệt người trùng tên mà không lộ SĐT
+    // Trả SĐT + email che giữa để phân biệt người trùng tên (không lộ đầy đủ)
     const members = r.rows.map(m => ({
       id: m.id,
       full_name: m.full_name,
-      phone_hint: m.phone ? `***${m.phone.slice(-3)}` : ''
+      phone_hint: maskPhone(m.phone),
+      email_hint: maskEmail(m.email)
     }));
     res.json({ members });
   } catch (err) { next(err); }

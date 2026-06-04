@@ -40,10 +40,13 @@ nameInput.addEventListener('input', () => {
       const data = await res.json();
       const members = data.members || [];
       if (!members.length) { suggestBox.classList.remove('show'); return; }
-      suggestBox.innerHTML = members.map(m =>
-        `<div class="suggest-item" data-id="${m.id}" data-name="${escapeText(m.full_name)}">
-           <span class="si-name">${escapeText(m.full_name)}</span>${m.phone_hint ? `<span class="si-hint">${escapeText(m.phone_hint)}</span>` : ''}
-         </div>`).join('');
+      suggestBox.innerHTML = members.map(m => {
+        const hints = [m.phone_hint, m.email_hint].filter(Boolean).map(escapeText).join(' • ');
+        return `<div class="suggest-item" data-id="${m.id}" data-name="${escapeText(m.full_name)}">
+           <div class="si-name">${escapeText(m.full_name)}</div>
+           ${hints ? `<div class="si-hint">${hints}</div>` : ''}
+         </div>`;
+      }).join('');
       suggestBox.classList.add('show');
       suggestBox.querySelectorAll('.suggest-item').forEach(it => it.addEventListener('click', () => selectMember(it.dataset.id, it.dataset.name)));
     } catch (e) { suggestBox.classList.remove('show'); }
