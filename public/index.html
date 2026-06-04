@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>5AM Check-in - Đăng nhập</title>
+  <title>5AM Check-in - Quản trị</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="auth-page">
@@ -11,13 +11,12 @@
     <div class="brand">
       <div class="brand-logo">5AM</div>
       <h1>5AM Check-in</h1>
-      <p>Dậy sớm - Thành công sớm</p>
+      <p>Trang quản trị</p>
     </div>
 
     <div class="auth-card">
       <div class="tabs">
-        <button class="tab active" data-tab="login">Đăng nhập</button>
-        <button class="tab" data-tab="register">Đăng ký</button>
+        <button class="tab active" data-tab="login">Đăng nhập Admin</button>
       </div>
 
       <!-- LOGIN FORM -->
@@ -46,20 +45,19 @@
       <form id="forgot-form" class="auth-form">
         <div id="forgot-step-1">
           <p style="font-size:13px;color:#7f8c8d;margin-bottom:14px;">
-            Nhập tên đăng nhập, email hoặc số điện thoại đã đăng ký. Hệ thống sẽ gửi mã xác nhận đến email.
+            Nhập tên đăng nhập hoặc email admin. Hệ thống gửi mã xác nhận đến email.
           </p>
           <div class="form-group">
-            <label>Tên đăng nhập / Email / SĐT *</label>
+            <label>Tên đăng nhập / Email *</label>
             <input type="text" name="identifier" required>
             <div class="field-error"></div>
           </div>
           <div id="forgot-message-1" class="message"></div>
           <button type="button" id="forgot-send-code" class="btn-primary">Gửi mã xác nhận</button>
         </div>
-
         <div id="forgot-step-2" style="display:none;">
           <p style="font-size:13px;color:#7f8c8d;margin-bottom:14px;">
-            Mã xác nhận đã gửi đến <strong id="forgot-masked-email"></strong>. Hiệu lực 10 phút.
+            Mã đã gửi đến <strong id="forgot-masked-email"></strong>. Hiệu lực 10 phút.
           </p>
           <div class="form-group">
             <label>Mã xác nhận (8 chữ số) *</label>
@@ -87,60 +85,16 @@
           <button type="submit" class="btn-primary">Đặt mật khẩu mới</button>
           <button type="button" id="forgot-resend" class="btn-secondary" style="margin-top:8px;">Gửi lại mã</button>
         </div>
-
         <div style="text-align:center;margin-top:14px;">
           <a href="#" id="back-to-login" style="font-size:13px;color:#7f8c8d;">← Quay lại đăng nhập</a>
         </div>
       </form>
-
-      <!-- REGISTER FORM -->
-      <form id="register-form" class="auth-form">
-        <div class="form-group">
-          <label>Họ và tên *</label>
-          <input type="text" name="full_name" required>
-          <div class="field-error"></div>
-        </div>
-        <div class="form-group">
-          <label>Số điện thoại (Zalo) *</label>
-          <input type="text" name="phone" placeholder="0xxxxxxxxx" maxlength="10" required>
-          <div class="field-hint">10 chữ số, bắt đầu bằng số 0</div>
-          <div class="field-error"></div>
-        </div>
-        <div class="form-group">
-          <label>Email *</label>
-          <input type="email" name="email" placeholder="email@gmail.com" required>
-          <div class="field-hint">Chỉ chấp nhận @gmail.com hoặc @<span id="company-domain">company</span>.com</div>
-          <div class="field-error"></div>
-        </div>
-        <div class="form-group">
-          <label>Tên đăng nhập *</label>
-          <input type="text" name="username" required>
-          <div class="field-hint">Viết liền không dấu, chữ thường và số</div>
-          <div class="field-error"></div>
-        </div>
-        <div class="form-group">
-          <label>Mật khẩu *</label>
-          <div class="password-wrap">
-            <input type="password" name="password" required>
-            <button type="button" class="toggle-pwd" tabindex="-1">👁</button>
-          </div>
-          <div class="field-hint">Tối thiểu 8 ký tự, có IN HOA, thường, số, ký tự đặc biệt</div>
-          <div class="field-error"></div>
-        </div>
-        <div class="form-group">
-          <label>Nhập lại mật khẩu *</label>
-          <div class="password-wrap">
-            <input type="password" name="confirm_password" required>
-            <button type="button" class="toggle-pwd" tabindex="-1">👁</button>
-          </div>
-          <div class="field-error"></div>
-        </div>
-        <div id="register-message" class="message"></div>
-        <button type="submit" class="btn-primary">Tạo tài khoản</button>
-      </form>
     </div>
 
-    <div class="footer-note">© 2026 5AM Check-in</div>
+    <div class="footer-note">
+      Bạn cần gửi biên lai thanh toán?
+      <a href="/payment.html" style="color:white;font-weight:700;text-decoration:underline;">Bấm vào đây →</a>
+    </div>
   </div>
 
   <script src="/js/auth.js"></script>

@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>5AM Check-in</title>
+  <title>5AM Check-in - Quản trị</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="dashboard-page">
   <header class="topbar">
     <div class="topbar-brand">
       <div class="topbar-brand-icon">5AM</div>
-      <span>Check-in</span>
+      <span>Quản trị</span>
     </div>
     <div class="topbar-right">
       <span class="user-name" id="topbar-username">...</span>
@@ -19,381 +19,191 @@
   </header>
 
   <nav class="nav-tabs">
-    <button class="nav-tab active" data-page="home">Trang chính</button>
-    <button class="nav-tab" data-page="checkin">Check-in</button>
-    <button class="nav-tab" data-page="history">Lịch sử</button>
-    <button class="nav-tab" data-page="payment">Thanh toán</button>
-    <button class="nav-tab" data-page="admin" id="nav-admin" style="display:none;">⚙ Quản trị</button>
-    <button class="nav-tab" data-page="reports" id="nav-reports" style="display:none;">📊 Báo cáo</button>
-    <button class="nav-tab" data-page="settings">Cài đặt</button>
+    <button class="nav-tab active" data-page="checkin">✅ Điểm danh</button>
+    <button class="nav-tab" data-page="members">👥 Thành viên</button>
+    <button class="nav-tab" data-page="payments">💳 Thanh toán</button>
+    <button class="nav-tab" data-page="reports">📊 Báo cáo</button>
+    <button class="nav-tab" data-page="settings">⚙ Cài đặt</button>
   </nav>
 
   <div class="container">
 
-    <!-- ============ TRANG CHÍNH ============ -->
-    <section id="page-home" class="page active">
+    <!-- ============ ĐIỂM DANH ============ -->
+    <section id="page-checkin" class="page active">
       <div class="page-header">
-        <div class="page-title">Xin chào, <span id="home-fullname">...</span> 👋</div>
-        <div class="page-subtitle">Tổng quan check-in của bạn</div>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card checked">
-          <div class="stat-label">Đã check-in tháng này</div>
-          <div class="stat-value"><span id="stat-checked">0</span><span class="stat-suffix">ngày</span></div>
-        </div>
-        <div class="stat-card missed">
-          <div class="stat-label">Quên check-in tháng này</div>
-          <div class="stat-value"><span id="stat-missed">0</span><span class="stat-suffix">ngày</span></div>
-        </div>
-        <div class="stat-card total">
-          <div class="stat-label">Tổng số ngày check-in</div>
-          <div class="stat-value"><span id="stat-total">0</span><span class="stat-suffix">ngày</span></div>
-        </div>
+        <div class="page-title">Điểm danh</div>
+        <div class="page-subtitle">Tích chọn thành viên có mặt. Khung giờ: <span id="ci-window-label">5:00 - 5:59</span> sáng</div>
       </div>
 
       <div class="card">
-        <div class="card-title">Thông tin tài khoản</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Họ và tên</label>
-            <input type="text" id="info-fullname" readonly>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div class="checkin-clock" id="ci-clock" style="font-size:32px;">--:--:--</div>
+            <div class="checkin-date" id="ci-date" style="margin-bottom:0;"></div>
           </div>
-          <div class="form-group">
-            <label>Email</label>
-            <input type="text" id="info-email" readonly>
-          </div>
-          <div class="form-group">
-            <label>Số điện thoại</label>
-            <input type="text" id="info-phone" readonly>
-          </div>
-          <div class="form-group">
-            <label>Tên đăng nhập</label>
-            <input type="text" id="info-username" readonly>
-          </div>
+          <div id="ci-window-badge"></div>
+        </div>
+        <div id="ci-summary" style="margin-top:12px;font-size:14px;color:#7f8c8d;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <input type="text" id="ci-search" placeholder="🔍 Tìm thành viên theo tên..."
+                 style="flex:1;padding:10px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
+          <button class="btn-secondary" id="ci-refresh" style="width:auto;padding:8px 16px;">🔄</button>
+        </div>
+        <div id="ci-list">
+          <div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>
         </div>
       </div>
     </section>
 
-    <!-- ============ CHECK-IN ============ -->
-    <section id="page-checkin" class="page">
+    <!-- ============ THÀNH VIÊN ============ -->
+    <section id="page-members" class="page">
       <div class="page-header">
-        <div class="page-title">Check-in hôm nay</div>
-        <div class="page-subtitle">Khung giờ check-in: 5:00 - 6:00 sáng</div>
+        <div class="page-title">Danh sách thành viên</div>
+        <div class="page-subtitle">Import từ file Excel (.xlsx) gồm cột: Họ tên | Số điện thoại | Email | Địa chỉ</div>
       </div>
 
       <div class="card">
-        <div class="checkin-section">
-          <div class="checkin-clock" id="checkin-clock">--:--:--</div>
-          <div class="checkin-date" id="checkin-date">...</div>
-          <button class="checkin-btn disabled" id="checkin-btn" disabled>
-            <span class="ico" id="checkin-icon">⏰</span>
-            <span id="checkin-label">Đang tải...</span>
-          </button>
-          <div class="checkin-status-msg" id="checkin-msg"></div>
+        <div class="card-title">Import danh sách</div>
+        <div class="drop-zone" id="mem-drop" style="padding:24px;">
+          <input type="file" id="mem-file" accept=".xlsx,.xls" hidden>
+          <label for="mem-file" style="cursor:pointer;display:block;">
+            <div style="font-size:40px;margin-bottom:6px;">📄</div>
+            <div style="font-weight:600;margin-bottom:4px;">Chọn file Excel (.xlsx)</div>
+            <div style="font-size:12px;color:#7f8c8d;">Dòng đầu là tiêu đề cột. Cột: Họ tên, Số điện thoại, Email, Địa chỉ</div>
+          </label>
+        </div>
+        <div id="mem-import-status" style="margin-top:12px;font-size:13px;"></div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-secondary" id="mem-template" style="width:auto;padding:8px 16px;">📥 Tải file mẫu</button>
+          <button class="btn-reject" id="mem-clear-all" style="width:auto;padding:8px 16px;border-radius:8px;font-weight:600;">🗑 Xóa toàn bộ</button>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-title">Lịch sử gần đây</div>
-        <ul class="history-list" id="checkin-recent-list">
-          <li class="empty-state">
-            <div class="ico">📅</div>
-            <div>Chưa có check-in nào</div>
-          </li>
-        </ul>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <input type="text" id="mem-search" placeholder="🔍 Tìm theo tên / SĐT / email..."
+                 style="flex:1;padding:10px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
+          <button class="btn-secondary" id="mem-refresh" style="width:auto;padding:8px 16px;">🔄</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="report-table" id="mem-table">
+            <thead>
+              <tr><th>#</th><th>Họ và tên</th><th>SĐT</th><th>Email</th><th>Địa chỉ</th><th></th></tr>
+            </thead>
+            <tbody><tr><td colspan="6" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr></tbody>
+          </table>
+        </div>
+        <div id="mem-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;"></div>
       </div>
     </section>
 
-    <!-- ============ LỊCH SỬ ============ -->
-    <section id="page-history" class="page">
+    <!-- ============ THANH TOÁN (admin duyệt) ============ -->
+    <section id="page-payments" class="page">
       <div class="page-header">
-        <div class="page-title">Lịch sử check-in</div>
-        <div class="page-subtitle">Chỉ hiển thị các ngày đã check-in</div>
+        <div class="page-title">Duyệt thanh toán</div>
+        <div class="page-subtitle">Xác nhận / từ chối biên lai do thành viên gửi qua trang công khai</div>
+      </div>
+      <div class="card" style="padding:14px 20px;margin-bottom:14px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button class="filter-btn active" data-filter="pending">⏳ Chờ <span class="badge pending" id="cnt-pending">0</span></button>
+          <button class="filter-btn" data-filter="confirmed">✓ Đã duyệt <span class="badge verified" id="cnt-confirmed">0</span></button>
+          <button class="filter-btn" data-filter="rejected">✗ Từ chối <span class="badge rejected" id="cnt-rejected">0</span></button>
+          <button class="filter-btn" data-filter="all">Tất cả</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <input type="text" id="pay-search" placeholder="🔍 Tìm theo tên / SĐT / email..."
+                 style="flex:1;padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
+          <button class="btn-secondary" id="pay-refresh" style="width:auto;padding:8px 16px;">🔄</button>
+        </div>
       </div>
       <div class="card">
-        <ul class="history-list" id="history-list">
-          <li class="empty-state">
-            <div class="ico">📅</div>
-            <div>Chưa có check-in nào</div>
-          </li>
-        </ul>
+        <div id="pay-list"><div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div></div>
+        <div id="pay-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;"></div>
       </div>
     </section>
 
-    <!-- ============ THANH TOÁN ============ -->
-    <section id="page-payment" class="page">
-      <div class="page-header">
-        <div class="page-title">Thanh toán</div>
-        <div class="page-subtitle">Gửi biên lai chuyển khoản - hệ thống tự kiểm tra và xác nhận qua email</div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Thông tin người chuyển khoản</div>
-        <form id="payment-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Họ và tên *</label>
-              <input type="text" name="full_name" required>
-              <div class="field-error"></div>
-            </div>
-            <div class="form-group">
-              <label>Số điện thoại *</label>
-              <input type="text" name="phone" maxlength="10" required>
-              <div class="field-error"></div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Email nhận xác nhận *</label>
-            <input type="email" name="email" required>
-            <div class="field-hint">Email xác nhận sẽ được gửi đến địa chỉ này</div>
-            <div class="field-error"></div>
-          </div>
-
-          <div class="form-group">
-            <label>Ảnh biên lai chuyển khoản *</label>
-            <div id="payment-drop" class="drop-zone">
-              <input type="file" id="payment-image" accept="image/*" hidden>
-              <label for="payment-image" style="cursor:pointer;display:block;">
-                <div style="font-size:42px;margin-bottom:8px;">📷</div>
-                <div style="font-weight:600;margin-bottom:4px;">Chọn ảnh biên lai</div>
-                <div style="font-size:12px;color:#7f8c8d;">Hỗ trợ JPG, PNG. Tối đa 5MB. Ảnh sẽ tự nén lại nếu cần.</div>
-              </label>
-            </div>
-            <div id="payment-preview-wrap" style="display:none;margin-top:14px;">
-              <img id="payment-preview" style="max-width:100%;max-height:340px;border-radius:10px;border:1px solid #ecf0f1;" />
-              <div style="margin-top:8px;text-align:right;">
-                <button type="button" class="btn-secondary" id="payment-clear" style="max-width:140px;display:inline-block;width:auto;padding:6px 16px;">Đổi ảnh</button>
-              </div>
-            </div>
-            <div id="payment-ocr-status" style="margin-top:10px;font-size:13px;"></div>
-            <div class="field-error"></div>
-          </div>
-
-          <div id="payment-msg" class="message"></div>
-
-          <button type="submit" class="btn-primary" id="payment-submit" disabled style="max-width:240px;">
-            Gửi biên lai
-          </button>
-        </form>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Lịch sử thanh toán</div>
-        <ul class="history-list" id="payment-history-list">
-          <li class="empty-state">
-            <div class="ico">💳</div>
-            <div>Chưa có thanh toán nào</div>
-          </li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- ============ QUẢN TRỊ (chỉ admin) ============ -->
-    <section id="page-admin" class="page">
-      <div class="page-header">
-        <div class="page-title">Quản trị</div>
-        <div class="page-subtitle">Duyệt thanh toán, quản lý người dùng, nhật ký hệ thống</div>
-      </div>
-
-      <!-- Sub-tabs -->
-      <div class="card" style="padding:10px 14px;margin-bottom:14px;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="subtab-btn active" data-subtab="payments">💳 Thanh toán</button>
-          <button class="subtab-btn" data-subtab="users">👥 Người dùng</button>
-          <button class="subtab-btn" data-subtab="audit">📜 Nhật ký</button>
-        </div>
-      </div>
-
-      <!-- SUB: THANH TOÁN -->
-      <div id="subtab-payments" class="subtab-panel active">
-        <div class="card" style="padding:14px 20px;margin-bottom:14px;">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-            <button class="filter-btn active" data-filter="pending">
-              ⏳ Chờ xác nhận <span class="badge pending" id="cnt-pending">0</span>
-            </button>
-            <button class="filter-btn" data-filter="confirmed">
-              ✓ Đã xác nhận <span class="badge verified" id="cnt-confirmed">0</span>
-            </button>
-            <button class="filter-btn" data-filter="rejected">
-              ✗ Từ chối <span class="badge rejected" id="cnt-rejected">0</span>
-            </button>
-            <button class="filter-btn" data-filter="all">Tất cả</button>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:10px;">
-            <input type="text" id="admin-search" placeholder="🔍 Tìm theo tên / SĐT / email / username..."
-                   style="flex:1;padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
-            <button class="btn-secondary" id="admin-refresh" style="width:auto;padding:8px 16px;">🔄</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <div id="admin-payments-list">
-            <div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>
-          </div>
-          <div id="admin-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;"></div>
-        </div>
-      </div>
-
-      <!-- SUB: NGƯỜI DÙNG -->
-      <div id="subtab-users" class="subtab-panel">
-        <div class="card" style="padding:14px 20px;margin-bottom:14px;">
-          <div style="display:flex;gap:8px;">
-            <input type="text" id="users-search" placeholder="🔍 Tìm user theo tên / SĐT / email..."
-                   style="flex:1;padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
-            <button class="btn-secondary" id="users-refresh" style="width:auto;padding:8px 16px;">🔄</button>
-          </div>
-        </div>
-        <div class="card">
-          <div id="admin-users-list">
-            <div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>
-          </div>
-          <div id="users-pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;margin-top:16px;"></div>
-        </div>
-      </div>
-
-      <!-- SUB: NHẬT KÝ -->
-      <div id="subtab-audit" class="subtab-panel">
-        <div class="card">
-          <div class="card-title">Nhật ký hành động admin</div>
-          <ul class="history-list" id="admin-audit-list">
-            <li class="empty-state"><div class="ico">📜</div><div>Đang tải...</div></li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- Modal xác nhận / từ chối -->
-    <!-- (giữ nguyên modal cũ bên dưới) -->
-
-    <!-- Modal xác nhận / từ chối -->
-    <div class="modal-overlay" id="admin-modal">
+    <!-- Modal duyệt thanh toán -->
+    <div class="modal-overlay" id="pay-modal">
       <div class="modal" style="max-width:480px;">
-        <div class="modal-title" id="admin-modal-title">Xác nhận thanh toán</div>
-        <div class="modal-desc" id="admin-modal-desc"></div>
+        <div class="modal-title" id="pay-modal-title">Xác nhận thanh toán</div>
+        <div class="modal-desc" id="pay-modal-desc"></div>
         <div class="form-group">
-          <label>Ghi chú (sẽ gửi kèm email cho user)</label>
-          <textarea id="admin-modal-note" rows="3" maxlength="500" style="width:100%;padding:10px;border:1.5px solid #dfe6e9;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+          <label>Ghi chú (gửi kèm email cho người nộp)</label>
+          <textarea id="pay-modal-note" rows="3" maxlength="500" style="width:100%;padding:10px;border:1.5px solid #dfe6e9;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
           <div style="font-size:11px;color:#95a5a6;text-align:right;margin-top:4px;">Tối đa 500 ký tự</div>
         </div>
-        <div id="admin-modal-msg" class="message"></div>
+        <div id="pay-modal-msg" class="message"></div>
         <div class="modal-actions">
-          <button class="btn-secondary" id="admin-modal-cancel">Huỷ</button>
-          <button class="btn-primary" id="admin-modal-confirm">Xác nhận</button>
+          <button class="btn-secondary" id="pay-modal-cancel">Huỷ</button>
+          <button class="btn-primary" id="pay-modal-confirm">Xác nhận</button>
         </div>
       </div>
     </div>
 
-    <!-- ============ BÁO CÁO (chỉ admin) ============ -->
+    <!-- ============ BÁO CÁO ============ -->
     <section id="page-reports" class="page">
       <div class="page-header">
         <div class="page-title">Báo cáo</div>
-        <div class="page-subtitle">Tổng quan + báo cáo nhanh / chi tiết trong ngày. Tất cả có thể xuất Excel.</div>
+        <div class="page-subtitle">Tổng quan + báo cáo nhanh / chi tiết / xu hướng. Tất cả xuất Excel được.</div>
       </div>
 
-      <!-- 1. BÁO CÁO TỔNG -->
       <div class="card">
         <div class="card-title">📈 Báo cáo tổng</div>
         <div class="stats-grid" style="margin-bottom:0;">
-          <div class="stat-card">
-            <div class="stat-label">Tổng số User</div>
-            <div class="stat-value"><span id="rep-total-users">0</span><span class="stat-suffix">người</span></div>
-          </div>
-          <div class="stat-card checked">
-            <div class="stat-label">Đã check-in hôm nay</div>
-            <div class="stat-value"><span id="rep-checked-today">0</span><span class="stat-suffix">người</span></div>
-          </div>
-          <div class="stat-card missed">
-            <div class="stat-label">Chưa check-in hôm nay</div>
-            <div class="stat-value"><span id="rep-not-checked-today">0</span><span class="stat-suffix">người</span></div>
-          </div>
-          <div class="stat-card total">
-            <div class="stat-label">Tổng check-in mọi thời</div>
-            <div class="stat-value"><span id="rep-total-checkins">0</span><span class="stat-suffix">lượt</span></div>
-          </div>
+          <div class="stat-card"><div class="stat-label">Tổng thành viên</div><div class="stat-value"><span id="rep-total-users">0</span><span class="stat-suffix">người</span></div></div>
+          <div class="stat-card checked"><div class="stat-label">Đã điểm danh hôm nay</div><div class="stat-value"><span id="rep-checked-today">0</span><span class="stat-suffix">người</span></div></div>
+          <div class="stat-card missed"><div class="stat-label">Chưa điểm danh hôm nay</div><div class="stat-value"><span id="rep-not-checked-today">0</span><span class="stat-suffix">người</span></div></div>
+          <div class="stat-card total"><div class="stat-label">Tổng lượt điểm danh</div><div class="stat-value"><span id="rep-total-checkins">0</span><span class="stat-suffix">lượt</span></div></div>
         </div>
       </div>
 
-      <!-- Date picker chung cho 2 báo cáo daily -->
       <div class="card" style="padding:14px 20px;">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
           <label style="font-weight:600;font-size:14px;">Chọn ngày:</label>
           <input type="date" id="rep-date" min="2024-01-01" style="padding:8px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
-          <div style="display:flex;gap:6px;">
-            <button class="btn-secondary" data-quick="today" style="padding:8px 14px;width:auto;font-size:12px;">Hôm nay</button>
-            <button class="btn-secondary" data-quick="yesterday" style="padding:8px 14px;width:auto;font-size:12px;">Hôm qua</button>
-          </div>
-          <button class="btn-secondary" id="rep-reload" style="max-width:120px;display:inline-block;width:auto;padding:8px 16px;">🔄 Reload</button>
+          <button class="btn-secondary" data-quick="today" style="padding:8px 14px;width:auto;font-size:12px;">Hôm nay</button>
+          <button class="btn-secondary" data-quick="yesterday" style="padding:8px 14px;width:auto;font-size:12px;">Hôm qua</button>
+          <button class="btn-secondary" id="rep-reload" style="width:auto;padding:8px 16px;">🔄 Reload</button>
         </div>
       </div>
 
-      <!-- 2. BÁO CÁO NHANH -->
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-          <div>
-            <div class="card-title" style="margin-bottom:4px;">⚡ Báo cáo nhanh trong ngày</div>
-            <div style="font-size:13px;color:#7f8c8d;" id="rep-daily-summary">Đang tải...</div>
-          </div>
+          <div><div class="card-title" style="margin-bottom:4px;">⚡ Báo cáo nhanh trong ngày</div>
+            <div style="font-size:13px;color:#7f8c8d;" id="rep-daily-summary">Đang tải...</div></div>
           <button class="btn-primary" id="rep-daily-export" style="max-width:180px;padding:8px 16px;">📥 Xuất Excel</button>
         </div>
         <div style="overflow-x:auto;">
           <table class="report-table" id="rep-daily-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Họ và tên</th>
-                <th>Số điện thoại</th>
-                <th>Email</th>
-                <th>Check-in</th>
-                <th>Giờ</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="6" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr>
-            </tbody>
+            <thead><tr><th>#</th><th>Họ và tên</th><th>Số điện thoại</th><th>Email</th><th>Check-in</th><th>Giờ</th></tr></thead>
+            <tbody><tr><td colspan="6" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr></tbody>
           </table>
         </div>
       </div>
 
-      <!-- 3. BÁO CÁO CHI TIẾT -->
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-          <div>
-            <div class="card-title" style="margin-bottom:4px;">📋 Báo cáo chi tiết</div>
-            <div style="font-size:13px;color:#7f8c8d;">Streak, tổng đã check, tổng quên - cho mỗi user</div>
-          </div>
+          <div><div class="card-title" style="margin-bottom:4px;">📋 Báo cáo chi tiết</div>
+            <div style="font-size:13px;color:#7f8c8d;">Streak, tổng đã check, tổng chưa - mỗi thành viên</div></div>
           <button class="btn-primary" id="rep-detailed-export" style="max-width:180px;padding:8px 16px;">📥 Xuất Excel</button>
         </div>
         <div style="overflow-x:auto;">
           <table class="report-table" id="rep-detailed-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Họ và tên</th>
-                <th>Số điện thoại</th>
-                <th>Check-in</th>
-                <th>Ngày liên tiếp</th>
-                <th>Đã check-in</th>
-                <th>Chưa check-in</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="7" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr>
-            </tbody>
+            <thead><tr><th>#</th><th>Họ và tên</th><th>Số điện thoại</th><th>Check-in</th><th>Ngày liên tiếp</th><th>Đã check-in</th><th>Chưa check-in</th></tr></thead>
+            <tbody><tr><td colspan="7" style="text-align:center;padding:30px;color:#95a5a6;">Đang tải...</td></tr></tbody>
           </table>
         </div>
       </div>
 
-      <!-- 4. BÁO CÁO THEO KHOẢNG (tuần/tháng) + BIỂU ĐỒ -->
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-          <div>
-            <div class="card-title" style="margin-bottom:4px;">📊 Xu hướng check-in (tuần / tháng)</div>
-            <div style="font-size:13px;color:#7f8c8d;" id="rep-range-summary">Chọn khoảng thời gian</div>
-          </div>
+          <div><div class="card-title" style="margin-bottom:4px;">📊 Xu hướng điểm danh (tuần / tháng)</div>
+            <div style="font-size:13px;color:#7f8c8d;" id="rep-range-summary">Chọn khoảng thời gian</div></div>
           <button class="btn-primary" id="rep-range-export" style="max-width:180px;padding:8px 16px;">📥 Xuất Excel</button>
         </div>
-
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
           <button class="btn-secondary range-quick active" data-range="week" style="width:auto;padding:8px 16px;font-size:13px;">7 ngày</button>
           <button class="btn-secondary range-quick" data-range="month" style="width:auto;padding:8px 16px;font-size:13px;">Tháng này</button>
@@ -404,76 +214,41 @@
           <input type="date" id="rep-range-to" min="2024-01-01" style="padding:7px 10px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
           <button class="btn-secondary" id="rep-range-apply" style="width:auto;padding:8px 16px;font-size:13px;">Áp dụng</button>
         </div>
-
-        <div style="position:relative;height:280px;">
-          <canvas id="rep-chart"></canvas>
-        </div>
+        <div style="position:relative;height:280px;"><canvas id="rep-chart"></canvas></div>
       </div>
     </section>
 
     <!-- ============ CÀI ĐẶT ============ -->
     <section id="page-settings" class="page">
       <div class="page-header">
-        <div class="page-title">Cài đặt hệ thống</div>
-        <div class="page-subtitle">Cập nhật thông tin cá nhân và mật khẩu</div>
+        <div class="page-title">Cài đặt tài khoản admin</div>
+        <div class="page-subtitle">Cập nhật thông tin và mật khẩu</div>
       </div>
 
       <div class="card">
         <div class="card-title">Thông tin cá nhân</div>
         <form id="profile-form">
           <div class="form-row">
-            <div class="form-group">
-              <label>Họ và tên</label>
-              <input type="text" name="full_name" required>
-              <div class="field-error"></div>
-            </div>
-            <div class="form-group">
-              <label>Email</label>
-              <input type="email" name="email" required>
-              <div class="field-error"></div>
-            </div>
+            <div class="form-group"><label>Họ và tên</label><input type="text" name="full_name" required><div class="field-error"></div></div>
+            <div class="form-group"><label>Email</label><input type="email" name="email" required><div class="field-error"></div></div>
           </div>
           <div id="profile-msg" class="message"></div>
-          <button type="submit" class="btn-primary" style="max-width: 200px;">Cập nhật</button>
+          <button type="submit" class="btn-primary" style="max-width:200px;">Cập nhật</button>
         </form>
       </div>
 
       <div class="card">
         <div class="card-title">Đổi mật khẩu</div>
-        <p style="font-size: 13px; color: #7f8c8d; margin-bottom: 14px;">
-          Bước 1: Gửi mã xác nhận đến email. Bước 2: Nhập mã và mật khẩu mới.
-        </p>
-        <button type="button" class="btn-secondary" id="btn-request-code" style="max-width: 240px;">
-          Gửi mã xác nhận đến email
-        </button>
-
-        <form id="password-form" style="margin-top: 20px; display: none;">
-          <div class="form-group">
-            <label>Mã xác nhận (6 chữ số)</label>
-            <input type="text" name="code" maxlength="6" required>
-            <div class="field-error"></div>
-          </div>
+        <p style="font-size:13px;color:#7f8c8d;margin-bottom:14px;">Bước 1: gửi mã đến email. Bước 2: nhập mã + mật khẩu mới.</p>
+        <button type="button" class="btn-secondary" id="btn-request-code" style="max-width:240px;">Gửi mã xác nhận đến email</button>
+        <form id="password-form" style="margin-top:20px;display:none;">
+          <div class="form-group"><label>Mã xác nhận</label><input type="text" name="code" maxlength="8" required><div class="field-error"></div></div>
           <div class="form-row">
-            <div class="form-group">
-              <label>Mật khẩu mới</label>
-              <div class="password-wrap">
-                <input type="password" name="new_password" required>
-                <button type="button" class="toggle-pwd" tabindex="-1">👁</button>
-              </div>
-              <div class="field-hint">8+ ký tự, có IN HOA, thường, số, ký tự đặc biệt</div>
-              <div class="field-error"></div>
-            </div>
-            <div class="form-group">
-              <label>Nhập lại mật khẩu</label>
-              <div class="password-wrap">
-                <input type="password" name="confirm_password" required>
-                <button type="button" class="toggle-pwd" tabindex="-1">👁</button>
-              </div>
-              <div class="field-error"></div>
-            </div>
+            <div class="form-group"><label>Mật khẩu mới</label><div class="password-wrap"><input type="password" name="new_password" required><button type="button" class="toggle-pwd" tabindex="-1">👁</button></div><div class="field-hint">8+ ký tự, IN HOA, thường, số, ký tự đặc biệt</div><div class="field-error"></div></div>
+            <div class="form-group"><label>Nhập lại mật khẩu</label><div class="password-wrap"><input type="password" name="confirm_password" required><button type="button" class="toggle-pwd" tabindex="-1">👁</button></div><div class="field-error"></div></div>
           </div>
           <div id="password-msg" class="message"></div>
-          <button type="submit" class="btn-primary" style="max-width: 200px;">Đổi mật khẩu</button>
+          <button type="submit" class="btn-primary" style="max-width:200px;">Đổi mật khẩu</button>
         </form>
       </div>
     </section>
@@ -481,7 +256,6 @@
   </div>
 
   <div id="toast-container"></div>
-
   <script src="/js/app.js"></script>
 </body>
 </html>

@@ -6,8 +6,9 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const checkinRoutes = require('./routes/checkin');
 const settingsRoutes = require('./routes/settings');
-const paymentRoutes = require('./routes/payment');
 const adminRoutes = require('./routes/admin');
+const membersRoutes = require('./routes/members');
+const publicRoutes = require('./routes/public');
 
 const app = express();
 
@@ -19,11 +20,12 @@ app.use(express.json({ limit: '6mb' }));
 // (trên Vercel, /public được CDN serve tự động qua vercel.json)
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/checkin', checkinRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/payment', paymentRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/auth', authRoutes);          // admin login + đổi mật khẩu
+app.use('/api/checkin', checkinRoutes);    // admin điểm danh thành viên
+app.use('/api/settings', settingsRoutes);  // admin profile/password
+app.use('/api/admin', adminRoutes);        // duyệt thanh toán + báo cáo + audit
+app.use('/api/members', membersRoutes);    // admin import/quản lý thành viên
+app.use('/api/public', publicRoutes);      // CÔNG KHAI: gợi ý tên + submit thanh toán
 
 app.get('/api/health', (req, res) => {
   res.json({

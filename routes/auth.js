@@ -3,103 +3,13 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../lib/db');
 const config = require('../config');
-const { validateRegister, validatePassword } = require('../utils/validators');
+const { validatePassword } = require('../utils/validators');
 const { sendResetCode } = require('../utils/email');
 
 const router = express.Router();
 
-// Lấy IP client (Vercel đặt qua x-forwarded-for)
-function getClientIp(req) {
-  const fwd = req.headers['x-forwarded-for'];
-  if (fwd) return String(fwd).split(',')[0].trim();
-  return req.ip || req.socket?.remoteAddress || 'unknown';
-}
-
-// Rate limit đăng ký: tối đa 5 lần / IP / giờ
-const REGISTER_LIMIT = 5;
-const REGISTER_WINDOW_MS = 60 * 60 * 1000;
-async function checkRegisterRateLimit(ip) {
-  const now = Date.now();
-  const r = await query('SELECT * FROM register_attempts WHERE ip = $1', [ip]);
-  const row = r.rows[0];
-  if (!row || now - Number(row.window_start) > REGISTER_WINDOW_MS) {
-    // Cửa sổ mới
-    await query(`
-      INSERT INTO register_attempts (ip, count, window_start)
-      VALUES ($1, 1, $2)
-      ON CONFLICT (ip) DO UPDATE SET count = 1, window_start = $2
-    `, [ip, now]);
-    return { allowed: true };
-  }
-  if (row.count >= REGISTER_LIMIT) {
-    const retryMin = Math.ceil((REGISTER_WINDOW_MS - (now - Number(row.window_start))) / 60000);
-    return { allowed: false, retryMin };
-  }
-  await query('UPDATE register_attempts SET count = count + 1 WHERE ip = $1', [ip]);
-  return { allowed: true };
-}
-
-// ============== ĐĂNG KÝ ==============
-router.post('/register', async (req, res, next) => {
-  try {
-    // Rate limit theo IP
-    const ip = getClientIp(req);
-    const rl = await checkRegisterRateLimit(ip);
-    if (!rl.allowed) {
-      return res.status(429).json({
-        error: `Bạn đã đăng ký quá nhiều lần. Vui lòng thử lại sau ${rl.retryMin} phút.`
-      });
-    }
-
-    const data = req.body || {};
-    const errors = validateRegister(data);
-    if (Object.keys(errors).length) {
-      return res.status(400).json({ error: 'Dữ liệu không hợp lệ', fields: errors });
-    }
-
-    const phone = data.phone;
-    const email = data.email.toLowerCase();
-    const username = data.username.toLowerCase();
-
-    // Kiểm tra trùng số điện thoại
-    const dupPhone = await query('SELECT id FROM users WHERE phone = $1', [phone]);
-    if (dupPhone.rows.length) {
-      return res.status(409).json({
-        error: 'Số điện thoại đã được sử dụng',
-        fields: { phone: 'Số điện thoại này đã có tài khoản' }
-      });
-    }
-    // Trùng email
-    const dupEmail = await query('SELECT id FROM users WHERE email = $1', [email]);
-    if (dupEmail.rows.length) {
-      return res.status(409).json({
-        error: 'Email đã được sử dụng',
-        fields: { email: 'Email này đã có tài khoản' }
-      });
-    }
-    // Trùng username
-    const dupUsername = await query('SELECT id FROM users WHERE username = $1', [username]);
-    if (dupUsername.rows.length) {
-      return res.status(409).json({
-        error: 'Tên đăng nhập đã tồn tại',
-        fields: { username: 'Tên đăng nhập đã được sử dụng' }
-      });
-    }
-
-    const password_hash = await bcrypt.hash(data.password, 10);
-    const insert = await query(`
-      INSERT INTO users (full_name, phone, email, username, password_hash)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id
-    `, [data.full_name.trim(), phone, email, username, password_hash]);
-
-    return res.json({
-      ok: true,
-      message: 'Đăng ký thành công',
-      user_id: insert.rows[0].id
-    });
-  } catch (err) { next(err); }
-});
+// Chỉ ADMIN đăng nhập (không còn đăng ký user công khai).
+// Tài khoản admin tạo qua: npm run create-admin
 
 // ============== ĐĂNG NHẬP ==============
 router.post('/login', async (req, res, next) => {
