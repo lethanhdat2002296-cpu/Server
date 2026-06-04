@@ -170,6 +170,12 @@ form.addEventListener('submit', async e => {
     image_data: imageBase64, image_mime: imageMime, ocr_text: ocrText
   };
   let bad = false;
+  // BẮT BUỘC chọn tên từ gợi ý (phải có member_id)
+  if (!selectedMemberId) {
+    fieldErr(form.full_name, 'Vui lòng chọn đúng tên của bạn từ danh sách gợi ý');
+    msg('error', 'Bạn chưa chọn tên từ danh sách gợi ý. Gõ tên rồi chọn đúng tên của bạn. Nếu chưa có tên, liên hệ admin để được thêm vào danh sách.');
+    bad = true;
+  }
   const ne = V.name(data.full_name); if (ne) { fieldErr(form.full_name, ne); bad = true; }
   const pe = V.phone(data.phone); if (pe) { fieldErr(form.phone, pe); bad = true; }
   const ee = V.email(data.email); if (ee) { fieldErr(form.email, ee); bad = true; }
@@ -191,7 +197,7 @@ form.addEventListener('submit', async e => {
       document.getElementById('pay-success').style.display = 'block';
       document.getElementById('pay-success-msg').innerHTML = body.email_sent
         ? `Mã giao dịch <b>#${body.payment_id}</b>. Email xác nhận đã gửi đến <b>${escapeText(data.email)}</b>.<br>Admin sẽ xác nhận và phản hồi qua email.`
-        : `Mã giao dịch <b>#${body.payment_id}</b>. Đã ghi nhận. ${body.email_dev_mode ? '(DEV - email log ở console)' : '⚠ Email gửi lỗi, admin sẽ xử lý.'}`;
+        : `Mã giao dịch <b>#${body.payment_id}</b> — vui lòng <b>ghi nhớ mã này</b>.<br>${body.email_dev_mode ? '(DEV - email log ở console)' : '⚠ Hệ thống chưa gửi được email xác nhận. Biên lai vẫn đã được ghi nhận, vui lòng liên hệ admin kèm mã giao dịch trên.'}`;
     } else {
       if (body.fields) Object.entries(body.fields).forEach(([k, v]) => { if (form[k]) fieldErr(form[k], v); });
       msg('error', body.error || 'Gửi thất bại');

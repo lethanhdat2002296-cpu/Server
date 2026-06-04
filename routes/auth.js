@@ -38,7 +38,7 @@ router.post('/login', async (req, res, next) => {
     const user = userRes.rows[0];
     if (!user) {
       return res.status(404).json({
-        error: 'Tài khoản chưa tồn tại. Vui lòng đăng ký',
+        error: 'Tài khoản admin không tồn tại',
         not_found: true
       });
     }

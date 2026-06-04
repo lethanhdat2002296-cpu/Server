@@ -91,4 +91,31 @@ router.post('/toggle', adminRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ============== TÍCH / BỎ TÍCH TẤT CẢ ==============
+// body: { present: true|false } - chỉ trong khung giờ
+router.post('/bulk', adminRequired, async (req, res, next) => {
+  try {
+    const t = nowInTimezone();
+    if (!isWindowOpen(t)) {
+      return res.status(400).json({
+        error: `Chỉ điểm danh được từ ${config.CHECKIN_START_HOUR}:00 đến ${config.CHECKIN_START_HOUR}:59 sáng`,
+        window_open: false
+      });
+    }
+    const present = !!(req.body && req.body.present);
+    if (present) {
+      // Tích tất cả thành viên chưa điểm danh hôm nay
+      await query(`
+        INSERT INTO member_checkins (member_id, check_date, check_time)
+        SELECT id, $1, $2 FROM members
+        ON CONFLICT (member_id, check_date) DO NOTHING
+      `, [t.date, t.time]);
+    } else {
+      // Bỏ tích tất cả của hôm nay
+      await query('DELETE FROM member_checkins WHERE check_date = $1', [t.date]);
+    }
+    res.json({ ok: true, present });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

@@ -4,12 +4,20 @@ const { query } = require('../lib/db');
 const { analyzeReceiptText } = require('../utils/receipt');
 const { sendPaymentConfirmation } = require('../utils/email');
 const { validateEmail, validatePhone, validateFullName } = require('../utils/validators');
+const { getClientIp, checkRateLimit } = require('../utils/ratelimit');
 
 const router = express.Router();
 
+// Rate-limit nhẹ cho việc dò danh sách (search + detail): 120 req / 10 phút / IP
+async function lookupLimit(req, res, next) {
+  const rl = await checkRateLimit(`pub:lookup:${getClientIp(req)}`, 120, 10 * 60 * 1000);
+  if (!rl.allowed) return res.status(429).json({ error: 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút' });
+  next();
+}
+
 // ============== GỢI Ý TÊN (autocomplete) ==============
 // GET /api/public/members/search?q=...
-router.get('/members/search', async (req, res, next) => {
+router.get('/members/search', lookupLimit, async (req, res, next) => {
   try {
     const q = (req.query.q || '').trim().toLowerCase();
     if (q.length < 1) return res.json({ members: [] });
@@ -33,7 +41,7 @@ router.get('/members/search', async (req, res, next) => {
 
 // ============== CHI TIẾT 1 MEMBER (để autofill) ==============
 // GET /api/public/members/:id
-router.get('/members/:id', async (req, res, next) => {
+router.get('/members/:id', lookupLimit, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     const r = await query('SELECT id, full_name, phone, email, address FROM members WHERE id = $1', [id]);
@@ -46,6 +54,12 @@ router.get('/members/:id', async (req, res, next) => {
 // body: { member_id, full_name, phone, email, image_data, image_mime, ocr_text }
 router.post('/payment', async (req, res, next) => {
   try {
+    // Rate-limit: tối đa 8 lần / IP / giờ (chống spam + flood email)
+    const rl = await checkRateLimit(`pub:pay:${getClientIp(req)}`, 8, 60 * 60 * 1000);
+    if (!rl.allowed) {
+      return res.status(429).json({ error: `Bạn đã gửi quá nhiều lần. Vui lòng thử lại sau ${Math.ceil(rl.retryAfterSec / 60)} phút.` });
+    }
+
     const { member_id, full_name, phone, email, image_data, image_mime, ocr_text } = req.body || {};
 
     const errors = {};
@@ -56,17 +70,27 @@ router.post('/payment', async (req, res, next) => {
     const emailErr = validateEmail(email);
     if (emailErr) errors.email = emailErr;
     if (!image_data) errors.image = 'Vui lòng đính kèm ảnh biên lai';
-    if (image_data && image_data.length > 5 * 1024 * 1024) errors.image = 'Ảnh quá lớn (>5MB)';
+    else if (!/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(image_data)) errors.image = 'Ảnh không hợp lệ';
+    else if (image_data.length > 5 * 1024 * 1024) errors.image = 'Ảnh quá lớn (>5MB)';
     if (Object.keys(errors).length) {
       return res.status(400).json({ error: 'Dữ liệu không hợp lệ', fields: errors });
     }
 
-    // member_id tùy chọn (nếu user chọn từ gợi ý). Kiểm tra tồn tại nếu có.
-    let memberId = null;
-    if (member_id) {
-      const m = await query('SELECT id FROM members WHERE id = $1', [parseInt(member_id, 10)]);
-      if (m.rows.length) memberId = m.rows[0].id;
+    // BẮT BUỘC: phải chọn thành viên từ gợi ý (member_id phải tồn tại)
+    if (!member_id) {
+      return res.status(400).json({
+        error: 'Vui lòng chọn đúng tên của bạn từ danh sách gợi ý. Nếu chưa có tên, liên hệ admin để được thêm.',
+        fields: { full_name: 'Chưa chọn tên từ danh sách' }
+      });
     }
+    const m = await query('SELECT id FROM members WHERE id = $1', [parseInt(member_id, 10)]);
+    if (!m.rows.length) {
+      return res.status(400).json({
+        error: 'Tên bạn chọn không còn trong danh sách. Vui lòng chọn lại hoặc liên hệ admin.',
+        fields: { full_name: 'Thành viên không tồn tại' }
+      });
+    }
+    const memberId = m.rows[0].id;
 
     const analysis = analyzeReceiptText(ocr_text);
 
@@ -115,8 +139,8 @@ router.post('/payment', async (req, res, next) => {
       payment_id: payment.id,
       is_receipt: analysis.is_receipt,
       email_sent: emailResult.ok,
-      email_dev_mode: emailResult.dev || false,
-      email_error: emailResult.ok ? null : (emailResult.err || 'Không gửi được email')
+      email_dev_mode: emailResult.dev || false
+      // Không trả chi tiết lỗi SMTP ra ngoài public
     });
   } catch (err) { next(err); }
 });

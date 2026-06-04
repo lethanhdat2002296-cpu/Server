@@ -142,6 +142,9 @@ async function loadCheckinToday() {
       clearTimeout(t); t = setTimeout(() => { ciSearch = e.target.value.trim(); loadCheckinToday(); }, 350);
     });
     document.getElementById('ci-refresh').addEventListener('click', loadCheckinToday);
+    // Nút tích/bỏ tất cả
+    document.getElementById('ci-check-all').addEventListener('click', () => bulkCheckin(true));
+    document.getElementById('ci-uncheck-all').addEventListener('click', () => bulkCheckin(false));
   }
   const listEl = document.getElementById('ci-list');
   const r = await api('GET', `/api/checkin/today?search=${encodeURIComponent(ciSearch)}`);
@@ -152,16 +155,20 @@ async function loadCheckinToday() {
   document.getElementById('ci-window-badge').innerHTML = r.data.window_open
     ? '<span class="badge confirmed" style="font-size:13px;padding:6px 14px;">🟢 ĐANG MỞ ĐIỂM DANH</span>'
     : '<span class="badge pending" style="font-size:13px;padding:6px 14px;">⏸ NGOÀI GIỜ ĐIỂM DANH</span>';
-  document.getElementById('ci-summary').innerHTML =
-    `Tổng <b>${r.data.total}</b> thành viên • ✅ Đã điểm danh <b style="color:#00b894;">${r.data.checked}</b> • ⬜ Chưa <b style="color:#d63031;">${r.data.total - r.data.checked}</b>`;
+  let summary = `Tổng <b>${r.data.total}</b> thành viên • ✅ Đã điểm danh <b style="color:#00b894;">${r.data.checked}</b> • ⬜ Chưa <b style="color:#d63031;">${r.data.total - r.data.checked}</b>`;
+  if (!r.data.window_open) {
+    summary += `<br><span style="color:#d63031;font-weight:600;">⏸ Ngoài giờ điểm danh — chỉ xem, không tích được. Khung giờ: ${r.data.window_label} sáng.</span>`;
+  }
+  document.getElementById('ci-summary').innerHTML = summary;
+
+  // Nút bulk chỉ hiện khi cửa sổ mở + có thành viên
+  document.getElementById('ci-bulk-actions').style.display =
+    (r.data.window_open && (r.data.members || []).length > 0) ? 'flex' : 'none';
 
   const members = r.data.members || [];
   if (members.length === 0) {
-    listEl.innerHTML = `<div class="empty-state"><div class="ico">👥</div><div>${ciSearch ? 'Không tìm thấy' : 'Chưa có thành viên. Hãy import ở tab Thành viên.'}</div></div>`;
+    listEl.innerHTML = `<div class="empty-state"><div class="ico">👥</div><div>${ciSearch ? 'Không tìm thấy thành viên nào' : 'Chưa có thành viên. Vào tab "👥 Thành viên" để import danh sách Excel.'}</div></div>`;
     return;
-  }
-  if (!r.data.window_open) {
-    listEl.insertAdjacentHTML && (document.getElementById('ci-summary').innerHTML += '<br><span style="color:#d63031;">⚠ Hiện không trong khung giờ - chỉ xem, không tích được.</span>');
   }
 
   listEl.innerHTML = members.map(m => `
@@ -191,6 +198,18 @@ async function loadCheckinToday() {
       }
     });
   });
+}
+
+async function bulkCheckin(present) {
+  if (!confirm(present ? 'Tích điểm danh TẤT CẢ thành viên hôm nay?' : 'Bỏ tích điểm danh TẤT CẢ hôm nay?')) return;
+  const r = await api('POST', '/api/checkin/bulk', { present });
+  if (r && r.ok) {
+    showToast('success', present ? 'Đã tích tất cả' : 'Đã bỏ tất cả', '');
+    loadCheckinToday();
+  } else {
+    showToast('error', 'Không thực hiện được', r?.data?.error || 'Lỗi');
+    if (r?.data?.window_open === false) loadCheckinToday();
+  }
 }
 
 // ============================================================
@@ -314,7 +333,10 @@ async function loadMembers() {
       <td>${escapeText(m.phone||'—')}</td>
       <td>${escapeText(m.email||'—')}</td>
       <td>${escapeText(m.address||'—')}</td>
-      <td><button class="btn-reject" data-del="${m.id}" data-name="${escapeText(m.full_name)}" style="padding:5px 10px;border-radius:6px;font-size:12px;">🗑</button></td>
+      <td style="white-space:nowrap;">
+        <button class="btn-secondary" data-edit="${m.id}" style="padding:5px 10px;border-radius:6px;font-size:12px;width:auto;">✏</button>
+        <button class="btn-reject" data-del="${m.id}" data-name="${escapeText(m.full_name)}" style="padding:5px 10px;border-radius:6px;font-size:12px;">🗑</button>
+      </td>
     </tr>`).join('');
   tbody.querySelectorAll('button[data-del]').forEach(b => b.addEventListener('click', async () => {
     if (!confirm(`Xóa thành viên "${b.dataset.name}"?`)) return;
@@ -322,7 +344,67 @@ async function loadMembers() {
     if (rr && rr.ok) { showToast('success', 'Đã xóa', rr.data.message); loadMembers(); }
     else showToast('error', 'Lỗi', rr?.data?.error || '');
   }));
+  tbody.querySelectorAll('button[data-edit]').forEach(b => {
+    const m = members.find(x => String(x.id) === b.dataset.edit);
+    b.addEventListener('click', () => openMemberEditModal(m));
+  });
   renderPagination('mem-pagination', r.data.total||0, memPage, MEM_PAGE, p => { memPage=p; loadMembers(); });
+}
+
+// Modal sửa thành viên (tạo động)
+function openMemberEditModal(m) {
+  let modal = document.getElementById('member-edit-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'member-edit-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `<div class="modal">
+      <div class="modal-title">Sửa thành viên</div>
+      <div class="form-group"><label>Họ và tên *</label><input type="text" id="me-name"><div class="field-error"></div></div>
+      <div class="form-group"><label>Số điện thoại</label><input type="text" id="me-phone" maxlength="10"></div>
+      <div class="form-group"><label>Email</label><input type="text" id="me-email"></div>
+      <div class="form-group"><label>Địa chỉ</label><input type="text" id="me-address"></div>
+      <div id="me-msg" class="message"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="me-cancel">Huỷ</button>
+        <button class="btn-primary" id="me-save">Lưu</button>
+      </div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target.id === 'member-edit-modal') modal.classList.remove('show'); });
+    modal.querySelector('#me-cancel').addEventListener('click', () => modal.classList.remove('show'));
+    modal.querySelector('#me-phone').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); });
+    modal.querySelector('#me-save').addEventListener('click', saveMemberEdit);
+  }
+  modal.dataset.id = m.id;
+  modal.querySelector('#me-name').value = m.full_name || '';
+  modal.querySelector('#me-phone').value = m.phone || '';
+  modal.querySelector('#me-email').value = m.email || '';
+  modal.querySelector('#me-address').value = m.address || '';
+  modal.querySelector('#me-msg').className = 'message';
+  modal.classList.add('show');
+}
+
+async function saveMemberEdit() {
+  const modal = document.getElementById('member-edit-modal');
+  const id = modal.dataset.id;
+  const data = {
+    full_name: modal.querySelector('#me-name').value.trim(),
+    phone: modal.querySelector('#me-phone').value.trim(),
+    email: modal.querySelector('#me-email').value.trim().toLowerCase(),
+    address: modal.querySelector('#me-address').value.trim()
+  };
+  if (!data.full_name) { showMsg('me-msg', 'error', 'Vui lòng nhập họ tên'); return; }
+  const btn = modal.querySelector('#me-save');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  const r = await api('PUT', `/api/members/${id}`, data);
+  if (r && r.ok) {
+    modal.classList.remove('show');
+    showToast('success', 'Đã cập nhật', '');
+    loadMembers();
+  } else {
+    showMsg('me-msg', 'error', r?.data?.error || 'Lỗi');
+  }
+  btn.disabled = false; btn.textContent = 'Lưu';
 }
 
 // ============================================================
@@ -377,10 +459,11 @@ async function loadPayments() {
       : '<span class="badge rejected">✗ Từ chối</span>';
     const ocr = p.is_receipt ? '<span class="badge sent">🤖 OCR pass</span>' : '';
     const emailFail = (!isPending && p.email_sent === false) ? '<span class="badge rejected">📧 Email lỗi</span>' : '';
+    const noMatch = !p.member_id ? '<span class="badge pending">⚠ Chưa khớp TV</span>' : '';
     const note = p.admin_note ? `<div class="adm-pay-sub" style="font-style:italic;">💬 ${escapeText(p.admin_note)}</div>` : '';
     return `<div class="adm-pay-item">
       <div class="adm-pay-info">
-        <div class="adm-pay-name">#${p.id} - ${escapeText(p.full_name)} ${badge} ${ocr} ${emailFail}</div>
+        <div class="adm-pay-name">#${p.id} - ${escapeText(p.full_name)} ${badge} ${ocr} ${emailFail} ${noMatch}</div>
         <div class="adm-pay-sub">📞 ${escapeText(p.phone)} • 📧 ${escapeText(p.email)}</div>
         <div class="adm-pay-sub">🕐 ${date}${p.detected_banks?` • 🏦 ${escapeText(p.detected_banks)}`:''}</div>
         ${note}

@@ -45,31 +45,10 @@ function validateFullName(name) {
   return null;
 }
 
-function validateRegister(data) {
-  const errors = {};
-  const fullNameErr = validateFullName(data.full_name);
-  if (fullNameErr) errors.full_name = fullNameErr;
-  const phoneErr = validatePhone(data.phone);
-  if (phoneErr) errors.phone = phoneErr;
-  const emailErr = validateEmail(data.email);
-  if (emailErr) errors.email = emailErr;
-  const usernameErr = validateUsername(data.username);
-  if (usernameErr) errors.username = usernameErr;
-  const passwordErr = validatePassword(data.password);
-  if (passwordErr) errors.password = passwordErr;
-  if (!data.confirm_password) {
-    errors.confirm_password = 'Vui lòng nhập lại mật khẩu';
-  } else if (data.password !== data.confirm_password) {
-    errors.confirm_password = 'Mật khẩu nhập lại không khớp';
-  }
-  return errors;
-}
-
 module.exports = {
   validatePhone,
   validateEmail,
   validateUsername,
   validatePassword,
-  validateFullName,
-  validateRegister
+  validateFullName
 };

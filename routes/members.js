@@ -59,7 +59,8 @@ router.post('/import', adminRequired, async (req, res, next) => {
         }
       } catch (e) {
         skipped++;
-        errors.push(`Dòng ${i + 1}: ${e.message}`);
+        console.error(`Import lỗi dòng ${i + 1}:`, e.message);
+        errors.push(`Dòng ${i + 1}: không lưu được (dữ liệu không hợp lệ)`);
       }
     }
 

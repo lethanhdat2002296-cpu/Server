@@ -47,10 +47,14 @@
       </div>
 
       <div class="card">
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
           <input type="text" id="ci-search" placeholder="🔍 Tìm thành viên theo tên..."
                  style="flex:1;padding:10px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
           <button class="btn-secondary" id="ci-refresh" style="width:auto;padding:8px 16px;">🔄</button>
+        </div>
+        <div id="ci-bulk-actions" style="display:none;gap:8px;margin-bottom:14px;">
+          <button class="btn-confirm" id="ci-check-all" style="width:auto;padding:8px 16px;border-radius:8px;">✅ Tích tất cả</button>
+          <button class="btn-reject" id="ci-uncheck-all" style="width:auto;padding:8px 16px;border-radius:8px;">⬜ Bỏ tất cả</button>
         </div>
         <div id="ci-list">
           <div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>
