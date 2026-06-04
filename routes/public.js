@@ -69,6 +69,24 @@ router.get('/members/:id', lookupLimit, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ============== LỊCH SỬ THANH TOÁN CỦA 1 MEMBER (public) ==============
+// GET /api/public/payments?member_id=...
+router.get('/payments', lookupLimit, async (req, res, next) => {
+  try {
+    const memberId = parseInt(req.query.member_id, 10);
+    if (!memberId) return res.json({ payments: [] });
+    res.set('Cache-Control', 'no-store');
+    const r = await query(`
+      SELECT id, status, detected_banks, admin_note, created_at, confirmed_at
+      FROM payments
+      WHERE member_id = $1
+      ORDER BY created_at DESC
+      LIMIT 30
+    `, [memberId]);
+    res.json({ payments: r.rows });
+  } catch (err) { next(err); }
+});
+
 // ============== SUBMIT THANH TOÁN (public) ==============
 // body: { member_id, full_name, phone, email, image_data, image_mime, ocr_text }
 router.post('/payment', async (req, res, next) => {

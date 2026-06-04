@@ -1,6 +1,7 @@
-// Trang thanh toán CÔNG KHAI (không cần đăng nhập)
+// Trang thanh toán CÔNG KHAI: trái = lịch sử, phải = gửi biên lai
 
 const form = document.getElementById('pay-form');
+const nameInput = document.getElementById('name-input');
 let imageBase64 = null, imageMime = null, ocrText = '', isReceipt = false, selectedMemberId = null;
 
 function fieldErr(input, msg) {
@@ -16,6 +17,7 @@ function msg(type, text) {
 function escapeText(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
+function fmtDate(s) { try { return new Date(s).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }); } catch (e) { return s; } }
 
 // ============ VALIDATORS ============
 const V = {
@@ -25,7 +27,6 @@ const V = {
 };
 
 // ============ AUTOCOMPLETE TÊN ============
-const nameInput = form.full_name;
 const suggestBox = document.getElementById('name-suggest');
 let suggestTimer = null;
 
@@ -53,7 +54,6 @@ nameInput.addEventListener('input', () => {
   }, 250);
 });
 
-// Ẩn gợi ý khi click ra ngoài
 document.addEventListener('click', e => {
   if (!suggestBox.contains(e.target) && e.target !== nameInput) suggestBox.classList.remove('show');
 });
@@ -62,7 +62,8 @@ async function selectMember(id, name) {
   selectedMemberId = id;
   nameInput.value = name;
   suggestBox.classList.remove('show');
-  // Lấy thông tin đầy đủ để autofill
+  fieldErr(nameInput, null);
+  // Autofill thông tin
   try {
     const res = await fetch(`/api/public/members/${id}`);
     const data = await res.json();
@@ -70,13 +71,55 @@ async function selectMember(id, name) {
       form.phone.value = data.member.phone || '';
       form.email.value = data.member.email || '';
       fieldErr(form.phone, null); fieldErr(form.email, null);
-      msg('success', '✓ Đã tìm thấy thông tin của bạn. Kiểm tra và đính kèm biên lai.');
+      msg('success', '✓ Đã tìm thấy thông tin của bạn. Xem lịch sử bên trái hoặc gửi biên lai mới bên phải.');
     }
   } catch (e) {}
+  // Tải lịch sử
+  loadHistory();
 }
 
 // Phone: chỉ số
 form.phone.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); });
+
+// ============ LỊCH SỬ THANH TOÁN ============
+function statusBadge(st) {
+  if (st === 'confirmed') return '<span class="badge confirmed">✓ Đã xác nhận</span>';
+  if (st === 'rejected') return '<span class="badge rejected">✗ Bị từ chối</span>';
+  return '<span class="badge pending">⏳ Chờ xác nhận</span>';
+}
+async function loadHistory() {
+  const listEl = document.getElementById('hist-list');
+  const refreshBtn = document.getElementById('hist-refresh');
+  if (!selectedMemberId) {
+    refreshBtn.disabled = true;
+    listEl.innerHTML = '<div class="empty-state" style="padding:30px 10px;"><div class="ico">🔎</div><div>Chọn tên của bạn ở trên để xem lịch sử thanh toán và trạng thái.</div></div>';
+    return;
+  }
+  refreshBtn.disabled = false;
+  listEl.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="ico">⏳</div><div>Đang tải...</div></div>';
+  try {
+    const res = await fetch(`/api/public/payments?member_id=${selectedMemberId}`);
+    const data = await res.json();
+    const items = data.payments || [];
+    if (!items.length) {
+      listEl.innerHTML = '<div class="empty-state" style="padding:30px 10px;"><div class="ico">🧾</div><div>Chưa có biên lai nào. Hãy gửi biên lai ở bên phải.</div></div>';
+      return;
+    }
+    listEl.innerHTML = items.map(p => `
+      <div class="hist-item">
+        <div class="hist-top">
+          <span class="hist-id">#${p.id}</span>
+          ${statusBadge(p.status)}
+        </div>
+        <div class="hist-date">🕐 ${fmtDate(p.created_at)}${p.detected_banks ? ` • 🏦 ${escapeText(p.detected_banks)}` : ''}</div>
+        ${p.confirmed_at ? `<div class="hist-date">✓ Xử lý: ${fmtDate(p.confirmed_at)}</div>` : ''}
+        ${p.admin_note ? `<div class="hist-note">💬 ${escapeText(p.admin_note)}</div>` : ''}
+      </div>`).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div class="empty-state" style="padding:20px;"><div>Lỗi tải lịch sử</div></div>';
+  }
+}
+document.getElementById('hist-refresh').addEventListener('click', loadHistory);
 
 // ============ ẢNH + OCR ============
 let tesseractPromise = null;
@@ -164,22 +207,21 @@ document.getElementById('pay-clear').addEventListener('click', () => {
 // ============ SUBMIT ============
 form.addEventListener('submit', async e => {
   e.preventDefault();
-  form.querySelectorAll('input').forEach(i => fieldErr(i, null));
+  [nameInput, form.phone, form.email].forEach(i => fieldErr(i, null));
   const data = {
     member_id: selectedMemberId,
-    full_name: form.full_name.value.trim(),
+    full_name: nameInput.value.trim(),
     phone: form.phone.value.trim(),
     email: form.email.value.trim().toLowerCase(),
     image_data: imageBase64, image_mime: imageMime, ocr_text: ocrText
   };
   let bad = false;
-  // BẮT BUỘC chọn tên từ gợi ý (phải có member_id)
   if (!selectedMemberId) {
-    fieldErr(form.full_name, 'Vui lòng chọn đúng tên của bạn từ danh sách gợi ý');
+    fieldErr(nameInput, 'Vui lòng chọn đúng tên của bạn từ danh sách gợi ý');
     msg('error', 'Bạn chưa chọn tên từ danh sách gợi ý. Gõ tên rồi chọn đúng tên của bạn. Nếu chưa có tên, liên hệ admin để được thêm vào danh sách.');
     bad = true;
   }
-  const ne = V.name(data.full_name); if (ne) { fieldErr(form.full_name, ne); bad = true; }
+  const ne = V.name(data.full_name); if (ne) { fieldErr(nameInput, ne); bad = true; }
   const pe = V.phone(data.phone); if (pe) { fieldErr(form.phone, pe); bad = true; }
   const ee = V.email(data.email); if (ee) { fieldErr(form.email, ee); bad = true; }
   if (!data.image_data) { msg('error', 'Vui lòng đính kèm ảnh biên lai'); bad = true; }
@@ -199,10 +241,14 @@ form.addEventListener('submit', async e => {
       form.style.display = 'none';
       document.getElementById('pay-success').style.display = 'block';
       document.getElementById('pay-success-msg').innerHTML = body.email_sent
-        ? `Mã giao dịch <b>#${body.payment_id}</b>. Email xác nhận đã gửi đến <b>${escapeText(data.email)}</b>.<br>Admin sẽ xác nhận và phản hồi qua email.`
-        : `Mã giao dịch <b>#${body.payment_id}</b> — vui lòng <b>ghi nhớ mã này</b>.<br>${body.email_dev_mode ? '(DEV - email log ở console)' : '⚠ Hệ thống chưa gửi được email xác nhận. Biên lai vẫn đã được ghi nhận, vui lòng liên hệ admin kèm mã giao dịch trên.'}`;
+        ? `Mã giao dịch <b>#${body.payment_id}</b>. Email xác nhận đã gửi đến <b>${escapeText(data.email)}</b>.<br>Theo dõi trạng thái ở mục Lịch sử bên trái.`
+        : `Mã giao dịch <b>#${body.payment_id}</b> — vui lòng <b>ghi nhớ mã này</b>.<br>${body.email_dev_mode ? '(DEV - email log ở console)' : '⚠ Chưa gửi được email xác nhận. Biên lai vẫn được ghi nhận, theo dõi trạng thái ở mục Lịch sử bên trái hoặc liên hệ admin.'}`;
+      loadHistory(); // cập nhật lịch sử ngay
     } else {
-      if (body.fields) Object.entries(body.fields).forEach(([k, v]) => { if (form[k]) fieldErr(form[k], v); });
+      if (body.fields) Object.entries(body.fields).forEach(([k, v]) => {
+        const target = k === 'full_name' ? nameInput : form[k];
+        if (target) fieldErr(target, v);
+      });
       msg('error', body.error || 'Gửi thất bại');
     }
   } catch (err) {
@@ -212,4 +258,12 @@ form.addEventListener('submit', async e => {
   }
 });
 
-document.getElementById('pay-again').addEventListener('click', () => location.reload());
+document.getElementById('pay-again').addEventListener('click', () => {
+  // Quay lại form, giữ nguyên tên đã chọn + lịch sử
+  document.getElementById('pay-success').style.display = 'none';
+  form.style.display = 'block';
+  document.getElementById('pay-clear').click();
+  msg('', '');
+  document.getElementById('pay-message').className = 'message';
+  loadHistory();
+});

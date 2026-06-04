@@ -3,30 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Gửi biên lai thanh toán - 5AM</title>
+  <title>Thanh toán - 5AM</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="auth-page">
-  <div class="auth-container" style="max-width:520px;">
+  <div class="auth-container" style="max-width:900px;">
     <div class="brand">
       <div class="brand-logo">5AM</div>
-      <h1>Gửi biên lai thanh toán</h1>
-      <p>Nhập họ tên của bạn để bắt đầu</p>
+      <h1>Thanh toán</h1>
+      <p>Nhập họ tên của bạn để tra cứu lịch sử & gửi biên lai</p>
     </div>
 
-    <div class="auth-card">
-      <form id="pay-form" class="auth-form active">
-        <!-- Tên + gợi ý -->
-        <div class="form-group" style="position:relative;">
-          <label>Họ và tên *</label>
-          <input type="text" name="full_name" autocomplete="off" placeholder="Gõ tên để tìm..." required>
-          <div id="name-suggest" class="suggest-box"></div>
-          <div class="field-hint">Gõ tên rồi <b>bấm chọn đúng tên của bạn</b> trong danh sách gợi ý để tự điền thông tin</div>
-          <div class="field-error"></div>
-        </div>
+    <!-- Ô nhập tên dùng chung (điều khiển cả 2 cột) -->
+    <div class="auth-card" style="padding:22px;margin-bottom:18px;">
+      <div class="form-group" style="position:relative;margin-bottom:0;">
+        <label>Họ và tên *</label>
+        <input type="text" id="name-input" autocomplete="off" placeholder="Gõ tên để tìm..." required>
+        <div id="name-suggest" class="suggest-box"></div>
+        <div class="field-hint">Gõ tên rồi <b>bấm chọn đúng tên của bạn</b> trong gợi ý. Thông tin & lịch sử sẽ hiện ra.</div>
+        <div class="field-error"></div>
+      </div>
+    </div>
 
-        <!-- Thông tin (hiện sau khi chọn / có thể sửa) -->
-        <div class="form-row">
+    <!-- 2 cột: trái lịch sử, phải gửi biên lai -->
+    <div class="pay-grid">
+      <!-- CỘT TRÁI: LỊCH SỬ -->
+      <div class="auth-card" style="padding:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div class="card-title" style="margin-bottom:0;">📋 Lịch sử thanh toán</div>
+          <button type="button" class="btn-secondary" id="hist-refresh" style="width:auto;padding:6px 12px;font-size:12px;" disabled>🔄</button>
+        </div>
+        <div id="hist-list">
+          <div class="empty-state" style="padding:30px 10px;">
+            <div class="ico">🔎</div>
+            <div>Chọn tên của bạn ở trên để xem lịch sử thanh toán và trạng thái.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CỘT PHẢI: GỬI BIÊN LAI -->
+      <div class="auth-card" style="padding:22px;">
+        <div class="card-title">💳 Gửi biên lai mới</div>
+        <form id="pay-form">
           <div class="form-group">
             <label>Số điện thoại *</label>
             <input type="text" name="phone" maxlength="10" placeholder="0xxxxxxxxx" required>
@@ -38,39 +56,38 @@
             <div class="field-hint">Email xác nhận sẽ gửi về đây</div>
             <div class="field-error"></div>
           </div>
-        </div>
 
-        <!-- Ảnh biên lai -->
-        <div class="form-group">
-          <label>Ảnh biên lai chuyển khoản *</label>
-          <div id="pay-drop" class="drop-zone">
-            <input type="file" id="pay-image" accept="image/*" hidden>
-            <label for="pay-image" style="cursor:pointer;display:block;">
-              <div style="font-size:42px;margin-bottom:8px;">📷</div>
-              <div style="font-weight:600;margin-bottom:4px;">Chọn ảnh biên lai</div>
-              <div style="font-size:12px;color:#7f8c8d;">JPG, PNG. Tối đa 5MB. Tự nén nếu cần.</div>
-            </label>
-          </div>
-          <div id="pay-preview-wrap" style="display:none;margin-top:14px;">
-            <img id="pay-preview" style="max-width:100%;max-height:320px;border-radius:10px;border:1px solid #ecf0f1;">
-            <div style="margin-top:8px;text-align:right;">
-              <button type="button" class="btn-secondary" id="pay-clear" style="width:auto;padding:6px 16px;">Đổi ảnh</button>
+          <div class="form-group">
+            <label>Ảnh biên lai chuyển khoản *</label>
+            <div id="pay-drop" class="drop-zone">
+              <input type="file" id="pay-image" accept="image/*" hidden>
+              <label for="pay-image" style="cursor:pointer;display:block;">
+                <div style="font-size:40px;margin-bottom:6px;">📷</div>
+                <div style="font-weight:600;margin-bottom:4px;">Chọn ảnh biên lai</div>
+                <div style="font-size:12px;color:#7f8c8d;">JPG, PNG. Tối đa 5MB.</div>
+              </label>
             </div>
+            <div id="pay-preview-wrap" style="display:none;margin-top:14px;">
+              <img id="pay-preview" style="max-width:100%;max-height:280px;border-radius:10px;border:1px solid #ecf0f1;">
+              <div style="margin-top:8px;text-align:right;">
+                <button type="button" class="btn-secondary" id="pay-clear" style="width:auto;padding:6px 16px;">Đổi ảnh</button>
+              </div>
+            </div>
+            <div id="pay-ocr-status" style="margin-top:10px;font-size:13px;"></div>
+            <div class="field-error"></div>
           </div>
-          <div id="pay-ocr-status" style="margin-top:10px;font-size:13px;"></div>
-          <div class="field-error"></div>
+
+          <div id="pay-message" class="message"></div>
+          <button type="submit" class="btn-primary" id="pay-submit" disabled>Gửi biên lai</button>
+        </form>
+
+        <!-- Trạng thái thành công -->
+        <div id="pay-success" style="display:none;text-align:center;padding:20px 0;">
+          <div style="font-size:54px;margin-bottom:6px;">✓</div>
+          <h2 style="color:#00b894;margin-bottom:8px;">Đã gửi thành công!</h2>
+          <p id="pay-success-msg" style="color:#555;font-size:14px;line-height:1.6;"></p>
+          <button class="btn-secondary" id="pay-again" style="margin-top:18px;max-width:220px;display:inline-block;width:auto;">Gửi biên lai khác</button>
         </div>
-
-        <div id="pay-message" class="message"></div>
-        <button type="submit" class="btn-primary" id="pay-submit" disabled>Gửi biên lai</button>
-      </form>
-
-      <!-- Trạng thái thành công -->
-      <div id="pay-success" style="display:none;padding:30px;text-align:center;">
-        <div style="font-size:60px;margin-bottom:10px;">✓</div>
-        <h2 style="color:#00b894;margin-bottom:8px;">Đã gửi thành công!</h2>
-        <p id="pay-success-msg" style="color:#555;font-size:14px;line-height:1.6;"></p>
-        <button class="btn-secondary" id="pay-again" style="margin-top:20px;max-width:220px;display:inline-block;width:auto;">Gửi biên lai khác</button>
       </div>
     </div>
 
