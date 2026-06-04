@@ -229,9 +229,15 @@ function initMembersTab() {
 }
 
 // Map tên cột Excel (linh hoạt tiếng Việt/Anh) → field
+function normalizeKey(k) {
+  return String(k).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')  // bỏ dấu (sắc/huyền/...)
+    .replace(/đ/g, 'd')                                 // đ → d (NFD không tách được)
+    .replace(/[^a-z0-9]/g, '');                         // bỏ khoảng trắng/ký tự khác
+}
 function pickField(row, keys) {
   for (const k of Object.keys(row)) {
-    const norm = k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+    const norm = normalizeKey(k);
     for (const want of keys) if (norm.includes(want)) return row[k];
   }
   return '';
