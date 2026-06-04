@@ -37,12 +37,10 @@ router.post('/import', adminRequired, async (req, res, next) => {
       if (!full_name) { skipped++; errors.push(`Dòng ${i + 1}: thiếu họ tên`); continue; }
 
       try {
+        // Dedupe THEO SỐ ĐIỆN THOẠI: trùng SĐT → update, không trùng (hoặc không có SĐT) → tạo mới
         let existing = null;
         if (phone) {
           existing = (await query('SELECT id FROM members WHERE phone = $1 LIMIT 1', [phone])).rows[0];
-        }
-        if (!existing && email) {
-          existing = (await query('SELECT id FROM members WHERE email = $1 LIMIT 1', [email])).rows[0];
         }
         if (existing) {
           await query(
