@@ -58,23 +58,40 @@ router.get('/members/search', lookupLimit, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ============== CHI TIẾT 1 MEMBER (để autofill) ==============
-// GET /api/public/members/:id
-router.get('/members/:id', lookupLimit, async (req, res, next) => {
+// Kiểm tra 4 số cuối SĐT khớp với member. Trả member nếu đúng, null nếu sai.
+async function verifyLast4(memberId, last4) {
+  if (!Number.isInteger(memberId) || memberId < 1) return null;
+  const r = await query('SELECT id, full_name, phone, email, address FROM members WHERE id = $1', [memberId]);
+  const m = r.rows[0];
+  if (!m) return null;
+  const code = String(last4 || '').replace(/\D/g, '');
+  if (!m.phone) return { error: 'no_phone' };       // không có SĐT → không xác minh được
+  if (code.length !== 4 || m.phone.slice(-4) !== code) return null;
+  return m;
+}
+
+// ============== XÁC MINH + CHI TIẾT 1 MEMBER (để autofill) ==============
+// GET /api/public/members/:id/verify?last4=XXXX
+router.get('/members/:id/verify', lookupLimit, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const r = await query('SELECT id, full_name, phone, email, address FROM members WHERE id = $1', [id]);
-    if (!r.rows.length) return res.status(404).json({ error: 'Không tìm thấy thành viên' });
-    res.json({ member: r.rows[0] });
+    const m = await verifyLast4(id, req.query.last4);
+    if (m && m.error === 'no_phone') {
+      return res.status(400).json({ error: 'Thành viên này chưa có số điện thoại để xác minh. Vui lòng liên hệ admin.' });
+    }
+    if (!m) return res.status(403).json({ error: '4 số cuối SĐT không đúng. Vui lòng thử lại.' });
+    res.set('Cache-Control', 'no-store');
+    res.json({ member: m });
   } catch (err) { next(err); }
 });
 
-// ============== LỊCH SỬ THANH TOÁN CỦA 1 MEMBER (public) ==============
-// GET /api/public/payments?member_id=...
+// ============== LỊCH SỬ THANH TOÁN CỦA 1 MEMBER (public, cần xác minh) ==============
+// GET /api/public/payments?member_id=...&last4=XXXX
 router.get('/payments', lookupLimit, async (req, res, next) => {
   try {
     const memberId = parseInt(req.query.member_id, 10);
-    if (!memberId) return res.json({ payments: [] });
+    const m = await verifyLast4(memberId, req.query.last4);
+    if (!m || m.error) return res.status(403).json({ error: 'Chưa xác minh', payments: [] });
     res.set('Cache-Control', 'no-store');
     const r = await query(`
       SELECT id, status, detected_banks, admin_note, created_at, confirmed_at

@@ -92,7 +92,8 @@ router.post('/toggle', adminRequired, async (req, res, next) => {
 });
 
 // ============== TÍCH / BỎ TÍCH TẤT CẢ ==============
-// body: { present: true|false } - chỉ trong khung giờ
+// body: { present: true|false, search?: string } - chỉ trong khung giờ
+// Nếu có search: chỉ áp dụng cho thành viên khớp tìm kiếm (tránh xóa nhầm toàn bộ)
 router.post('/bulk', adminRequired, async (req, res, next) => {
   try {
     const t = nowInTimezone();
@@ -103,18 +104,29 @@ router.post('/bulk', adminRequired, async (req, res, next) => {
       });
     }
     const present = !!(req.body && req.body.present);
+    const search = ((req.body && req.body.search) || '').trim().toLowerCase();
+    // Điều kiện lọc theo tên (nếu có)
+    const filterSql = search ? 'WHERE LOWER(full_name) LIKE $3' : '';
+    const idSubquery = `SELECT id FROM members ${search ? 'WHERE LOWER(full_name) LIKE $2' : ''}`;
+
+    let affected = 0;
     if (present) {
-      // Tích tất cả thành viên chưa điểm danh hôm nay
-      await query(`
+      const params = search ? [t.date, t.time, `%${search}%`] : [t.date, t.time];
+      const r = await query(`
         INSERT INTO member_checkins (member_id, check_date, check_time)
-        SELECT id, $1, $2 FROM members
+        SELECT id, $1, $2 FROM members ${filterSql}
         ON CONFLICT (member_id, check_date) DO NOTHING
-      `, [t.date, t.time]);
+      `, params);
+      affected = r.rowCount;
     } else {
-      // Bỏ tích tất cả của hôm nay
-      await query('DELETE FROM member_checkins WHERE check_date = $1', [t.date]);
+      const params = search ? [t.date, `%${search}%`] : [t.date];
+      const r = await query(
+        `DELETE FROM member_checkins WHERE check_date = $1 AND member_id IN (${idSubquery})`,
+        params
+      );
+      affected = r.rowCount;
     }
-    res.json({ ok: true, present });
+    res.json({ ok: true, present, affected, filtered: !!search });
   } catch (err) { next(err); }
 });
 

@@ -20,8 +20,19 @@
         <label>Họ và tên *</label>
         <input type="text" id="name-input" autocomplete="off" placeholder="Gõ tên để tìm..." required>
         <div id="name-suggest" class="suggest-box"></div>
-        <div class="field-hint">Gõ tên rồi <b>bấm chọn đúng tên của bạn</b> trong gợi ý. Thông tin & lịch sử sẽ hiện ra.</div>
+        <div class="field-hint">Gõ tên rồi <b>bấm chọn đúng tên của bạn</b> trong gợi ý.</div>
         <div class="field-error"></div>
+      </div>
+
+      <!-- Xác minh 4 số cuối SĐT (hiện sau khi chọn tên) -->
+      <div id="verify-block" class="form-group" style="display:none;margin-top:14px;margin-bottom:0;">
+        <label>🔒 Nhập 4 số cuối SĐT của <b id="verify-name"></b> để xác minh</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="verify-last4" maxlength="4" inputmode="numeric" placeholder="VD: 9602"
+                 style="flex:1;padding:12px 14px;border:1.5px solid #dfe6e9;border-radius:10px;font-size:18px;letter-spacing:4px;text-align:center;font-family:monospace;">
+          <button type="button" id="verify-btn" class="btn-primary" style="width:auto;padding:0 22px;">Xác minh</button>
+        </div>
+        <div class="field-error" id="verify-err"></div>
       </div>
     </div>
 

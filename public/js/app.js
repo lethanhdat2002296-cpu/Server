@@ -146,6 +146,8 @@ async function loadCheckinToday() {
     // Nút tích/bỏ tất cả
     document.getElementById('ci-check-all').addEventListener('click', () => bulkCheckin(true));
     document.getElementById('ci-uncheck-all').addEventListener('click', () => bulkCheckin(false));
+    // Xuất Excel điểm danh hôm nay
+    document.getElementById('ci-export').addEventListener('click', exportTodayAttendance);
   }
   const listEl = document.getElementById('ci-list');
   const r = await api('GET', `/api/checkin/today?search=${encodeURIComponent(ciSearch)}`);
@@ -202,15 +204,30 @@ async function loadCheckinToday() {
 }
 
 async function bulkCheckin(present) {
-  if (!confirm(present ? 'Tích điểm danh TẤT CẢ thành viên hôm nay?' : 'Bỏ tích điểm danh TẤT CẢ hôm nay?')) return;
-  const r = await api('POST', '/api/checkin/bulk', { present });
+  // Nếu đang lọc tìm kiếm → chỉ áp dụng cho nhóm đang lọc (tránh xóa nhầm toàn bộ)
+  const scope = ciSearch ? `nhóm đang lọc "${ciSearch}"` : 'TẤT CẢ thành viên';
+  if (!confirm(`${present ? 'Tích điểm danh' : 'Bỏ tích điểm danh'} ${scope} hôm nay?`)) return;
+  const r = await api('POST', '/api/checkin/bulk', { present, search: ciSearch });
   if (r && r.ok) {
-    showToast('success', present ? 'Đã tích tất cả' : 'Đã bỏ tất cả', '');
+    showToast('success', present ? 'Đã tích' : 'Đã bỏ', `${r.data.affected || 0} thành viên${r.data.filtered ? ' (theo bộ lọc)' : ''}`);
     loadCheckinToday();
   } else {
     showToast('error', 'Không thực hiện được', r?.data?.error || 'Lỗi');
     if (r?.data?.window_open === false) loadCheckinToday();
   }
+}
+
+async function exportTodayAttendance() {
+  const r = await api('GET', '/api/checkin/today');
+  if (!r || !r.ok) return showToast('error', 'Lỗi', r?.data?.error || '');
+  const rows = r.data.members || [];
+  if (!rows.length) return showToast('error', 'Không có dữ liệu', 'Chưa có thành viên');
+  exportToExcel(rows, `Diem danh ${r.data.date}`, `diem-danh-${r.data.date}.xlsx`, [
+    { key: '_', label: 'STT', width: 6 },
+    { key: 'full_name', label: 'Họ và tên', width: 28 },
+    { key: 'checked_in', label: 'Có mặt', value: x => x.checked_in ? 'Có' : 'Vắng', width: 10 },
+    { key: 'check_time', label: 'Giờ điểm danh', value: x => x.check_time || '', width: 16 }
+  ]);
 }
 
 // ============================================================
@@ -558,7 +575,12 @@ async function loadReportDaily(date) {
   const r = await api('GET', `/api/admin/reports/daily?date=${date}`);
   if (!r || !r.ok) return;
   lastDaily = r.data;
-  document.getElementById('rep-daily-summary').textContent = `Ngày ${r.data.date} • ${r.data.total} người • ✓ ${r.data.checked} • ✗ ${r.data.not_checked}`;
+  const sumEl = document.getElementById('rep-daily-summary');
+  if (r.data.archived_date) {
+    sumEl.innerHTML = `Ngày ${r.data.date} • <span style="color:#d35400;">⚠ Đã lưu trữ — chỉ còn tổng (${r.data.archived_total || 0} lượt), không còn chi tiết từng người.</span>`;
+  } else {
+    sumEl.textContent = `Ngày ${r.data.date} • ${r.data.total} người • ✓ ${r.data.checked} • ✗ ${r.data.not_checked}`;
+  }
   if (!r.data.rows.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#95a5a6;">Chưa có thành viên</td></tr>'; return; }
   tbody.innerHTML = r.data.rows.map((row, i) => `
     <tr><td class="num">${i+1}</td><td>${escapeText(row.full_name)}</td><td>${escapeText(row.phone||'—')}</td><td>${escapeText(row.email||'—')}</td>
@@ -739,6 +761,33 @@ function initBackupTab() {
   backupInitialized = true;
   document.getElementById('bk-export').addEventListener('click', exportBackup);
   document.getElementById('bk-archive').addEventListener('click', doArchive);
+  // Khôi phục từ JSON
+  const fileInput = document.getElementById('bk-restore-file');
+  document.getElementById('bk-restore-btn').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { if (e.target.files && e.target.files[0]) doRestore(e.target.files[0]); });
+}
+
+async function doRestore(file) {
+  if (!confirm('KHÔI PHỤC từ file JSON?\n\nToàn bộ dữ liệu hiện tại trong DB sẽ bị GHI ĐÈ. Chỉ nên dùng trên DB mới/trống.\n\nTiếp tục?')) {
+    document.getElementById('bk-restore-file').value = ''; return;
+  }
+  showMsg('bk-restore-msg', 'info', 'Đang đọc file...');
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (e) {
+    showMsg('bk-restore-msg', 'error', 'File JSON không hợp lệ');
+    document.getElementById('bk-restore-file').value = ''; return;
+  }
+  showMsg('bk-restore-msg', 'info', 'Đang khôi phục...');
+  const r = await api('POST', '/api/admin/restore', data);
+  if (r && r.ok) {
+    showMsg('bk-restore-msg', 'success', '✓ ' + r.data.message);
+    loadBackupStatus();
+  } else {
+    showMsg('bk-restore-msg', 'error', r?.data?.error || 'Khôi phục thất bại');
+  }
+  document.getElementById('bk-restore-file').value = '';
 }
 
 async function loadBackupStatus() {

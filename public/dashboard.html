@@ -53,9 +53,12 @@
                  style="flex:1;padding:10px 12px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
           <button class="btn-secondary" id="ci-refresh" style="width:auto;padding:8px 16px;">🔄</button>
         </div>
-        <div id="ci-bulk-actions" style="display:none;gap:8px;margin-bottom:14px;">
-          <button class="btn-confirm" id="ci-check-all" style="width:auto;padding:8px 16px;border-radius:8px;">✅ Tích tất cả</button>
-          <button class="btn-reject" id="ci-uncheck-all" style="width:auto;padding:8px 16px;border-radius:8px;">⬜ Bỏ tất cả</button>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+          <div id="ci-bulk-actions" style="display:none;gap:8px;">
+            <button class="btn-confirm" id="ci-check-all" style="width:auto;padding:8px 16px;border-radius:8px;">✅ Tích tất cả</button>
+            <button class="btn-reject" id="ci-uncheck-all" style="width:auto;padding:8px 16px;border-radius:8px;">⬜ Bỏ tất cả</button>
+          </div>
+          <button class="btn-secondary" id="ci-export" style="width:auto;padding:8px 16px;margin-left:auto;">📥 Xuất Excel hôm nay</button>
         </div>
         <div id="ci-list">
           <div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>
@@ -265,6 +268,19 @@
         </div>
         <button class="btn-reject" id="bk-archive" style="width:auto;padding:10px 18px;border-radius:8px;font-weight:600;">📦 Lưu trữ & dọn DB</button>
         <div id="bk-msg" class="message" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">3️⃣ Khôi phục từ file JSON</div>
+        <p style="font-size:13px;color:#7f8c8d;margin-bottom:6px;">
+          Dùng khi chuyển sang DB Neon mới (DB cũ đầy). Chọn file backup JSON đã tải về để nạp lại toàn bộ thành viên + số liệu lưu trữ.
+        </p>
+        <div style="background:#f8d7da;color:#721c24;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;">
+          ⚠ Khôi phục sẽ <b>GHI ĐÈ toàn bộ</b> dữ liệu hiện tại trong DB. Chỉ dùng trên DB mới/trống.
+        </div>
+        <input type="file" id="bk-restore-file" accept=".json,application/json" hidden>
+        <button class="btn-secondary" id="bk-restore-btn" style="width:auto;padding:10px 18px;">♻ Chọn file & Khôi phục</button>
+        <div id="bk-restore-msg" class="message" style="margin-top:12px;"></div>
       </div>
     </section>
 

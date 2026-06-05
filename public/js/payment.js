@@ -3,6 +3,7 @@
 const form = document.getElementById('pay-form');
 const nameInput = document.getElementById('name-input');
 let imageBase64 = null, imageMime = null, ocrText = '', isReceipt = false, selectedMemberId = null;
+let pendingMemberId = null, verifiedLast4 = '';
 
 function fieldErr(input, msg) {
   const wrap = input.closest('.form-group'); if (!wrap) return;
@@ -31,7 +32,13 @@ const suggestBox = document.getElementById('name-suggest');
 let suggestTimer = null;
 
 nameInput.addEventListener('input', () => {
+  // Gõ lại tên → reset xác minh + lịch sử
   selectedMemberId = null;
+  pendingMemberId = null;
+  verifiedLast4 = '';
+  document.getElementById('verify-block').style.display = 'none';
+  form.phone.value = ''; form.email.value = '';
+  loadHistory();
   const q = nameInput.value.trim();
   clearTimeout(suggestTimer);
   if (q.length < 1) { suggestBox.classList.remove('show'); return; }
@@ -58,24 +65,61 @@ document.addEventListener('click', e => {
   if (!suggestBox.contains(e.target) && e.target !== nameInput) suggestBox.classList.remove('show');
 });
 
-async function selectMember(id, name) {
-  selectedMemberId = id;
+// Chọn tên từ gợi ý → YÊU CẦU xác minh 4 số cuối SĐT trước khi hiện thông tin
+function selectMember(id, name) {
+  pendingMemberId = id;
+  selectedMemberId = null;
+  verifiedLast4 = '';
   nameInput.value = name;
   suggestBox.classList.remove('show');
   fieldErr(nameInput, null);
-  // Autofill thông tin
+  form.phone.value = ''; form.email.value = '';
+  loadHistory(); // reset lịch sử (chưa xác minh)
+  // Hiện ô xác minh
+  document.getElementById('verify-name').textContent = name;
+  document.getElementById('verify-block').style.display = 'block';
+  document.getElementById('verify-last4').value = '';
+  document.getElementById('verify-err').textContent = '';
+  msg('', ''); document.getElementById('pay-message').className = 'message';
+  setTimeout(() => document.getElementById('verify-last4').focus(), 50);
+}
+
+// Chỉ cho nhập số ở ô xác minh
+document.getElementById('verify-last4').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+});
+document.getElementById('verify-last4').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); doVerify(); }
+});
+document.getElementById('verify-btn').addEventListener('click', doVerify);
+
+async function doVerify() {
+  const last4 = document.getElementById('verify-last4').value.trim();
+  const errEl = document.getElementById('verify-err');
+  if (last4.length !== 4) { errEl.textContent = 'Nhập đủ 4 số cuối SĐT'; return; }
+  if (!pendingMemberId) return;
+  const btn = document.getElementById('verify-btn');
+  btn.disabled = true; btn.textContent = '...';
   try {
-    const res = await fetch(`/api/public/members/${id}`);
+    const res = await fetch(`/api/public/members/${pendingMemberId}/verify?last4=${last4}`);
     const data = await res.json();
     if (res.ok && data.member) {
+      selectedMemberId = pendingMemberId;
+      verifiedLast4 = last4;
       form.phone.value = data.member.phone || '';
       form.email.value = data.member.email || '';
       fieldErr(form.phone, null); fieldErr(form.email, null);
-      msg('success', '✓ Đã tìm thấy thông tin của bạn. Xem lịch sử bên trái hoặc gửi biên lai mới bên phải.');
+      document.getElementById('verify-block').style.display = 'none';
+      msg('success', '✓ Đã xác minh. Xem lịch sử bên trái hoặc gửi biên lai mới bên phải.');
+      loadHistory();
+    } else {
+      errEl.textContent = data.error || '4 số cuối SĐT không đúng';
     }
-  } catch (e) {}
-  // Tải lịch sử
-  loadHistory();
+  } catch (e) {
+    errEl.textContent = 'Không thể kết nối máy chủ';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Xác minh';
+  }
 }
 
 // Phone: chỉ số
@@ -98,7 +142,7 @@ async function loadHistory() {
   refreshBtn.disabled = false;
   listEl.innerHTML = '<div class="empty-state" style="padding:20px;"><div class="ico">⏳</div><div>Đang tải...</div></div>';
   try {
-    const res = await fetch(`/api/public/payments?member_id=${selectedMemberId}`);
+    const res = await fetch(`/api/public/payments?member_id=${selectedMemberId}&last4=${verifiedLast4}`);
     const data = await res.json();
     const items = data.payments || [];
     if (!items.length) {
