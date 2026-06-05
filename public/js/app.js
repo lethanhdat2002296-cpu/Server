@@ -352,6 +352,7 @@ async function loadMembers() {
       <td>${escapeText(m.email||'—')}</td>
       <td>${escapeText(m.address||'—')}</td>
       <td style="white-space:nowrap;">
+        <button class="btn-secondary" data-view="${m.id}" style="padding:5px 10px;border-radius:6px;font-size:12px;width:auto;">👁</button>
         <button class="btn-secondary" data-edit="${m.id}" style="padding:5px 10px;border-radius:6px;font-size:12px;width:auto;">✏</button>
         <button class="btn-reject" data-del="${m.id}" data-name="${escapeText(m.full_name)}" style="padding:5px 10px;border-radius:6px;font-size:12px;">🗑</button>
       </td>
@@ -366,7 +367,63 @@ async function loadMembers() {
     const m = members.find(x => String(x.id) === b.dataset.edit);
     b.addEventListener('click', () => openMemberEditModal(m));
   });
+  tbody.querySelectorAll('button[data-view]').forEach(b => {
+    b.addEventListener('click', () => openMemberDetailModal(b.dataset.view));
+  });
   renderPagination('mem-pagination', r.data.total||0, memPage, MEM_PAGE, p => { memPage=p; loadMembers(); });
+}
+
+// Modal xem chi tiết 1 thành viên (drill-down)
+async function openMemberDetailModal(id) {
+  let modal = document.getElementById('member-detail-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'member-detail-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `<div class="modal" style="max-width:560px;">
+      <div class="modal-title" id="md-title">Chi tiết thành viên</div>
+      <div id="md-body" style="margin:12px 0;max-height:70vh;overflow-y:auto;"></div>
+      <div class="modal-actions"><button class="btn-primary" id="md-close">Đóng</button></div></div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target.id === 'member-detail-modal') modal.classList.remove('show'); });
+    modal.querySelector('#md-close').addEventListener('click', () => modal.classList.remove('show'));
+  }
+  const body = modal.querySelector('#md-body');
+  body.innerHTML = '<div class="empty-state"><div class="ico">⏳</div><div>Đang tải...</div></div>';
+  modal.classList.add('show');
+
+  const r = await api('GET', `/api/admin/members/${id}/detail`);
+  if (!r || !r.ok) { body.innerHTML = `<div class="empty-state"><div>${r?.data?.error||'Lỗi'}</div></div>`; return; }
+  const d = r.data, m = d.member;
+  modal.querySelector('#md-title').textContent = m.full_name;
+
+  const checkinBadge = st => st === 'confirmed' ? '<span class="badge confirmed">✓ Đã xác nhận</span>'
+    : st === 'rejected' ? '<span class="badge rejected">✗ Từ chối</span>' : '<span class="badge pending">⏳ Chờ</span>';
+
+  const datesHtml = (d.recent_dates || []).length
+    ? d.recent_dates.map(x => `<span style="display:inline-block;background:#d4f5ea;color:#00b894;padding:3px 9px;border-radius:12px;font-size:12px;margin:2px;">${x.check_date} ${x.check_time ? x.check_time.slice(0,5) : ''}</span>`).join('')
+    : '<span style="color:#95a5a6;">Chưa có điểm danh live</span>';
+
+  const paysHtml = (d.payments || []).length
+    ? d.payments.map(p => `<div style="border-bottom:1px solid #ecf0f1;padding:8px 0;font-size:13px;">
+        #${p.id} ${checkinBadge(p.status)} <span style="color:#95a5a6;">${new Date(p.created_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}</span>
+        ${p.admin_note ? `<div style="font-style:italic;color:#555;">💬 ${escapeText(p.admin_note)}</div>` : ''}</div>`).join('')
+    : '<span style="color:#95a5a6;">Chưa có thanh toán</span>';
+
+  body.innerHTML = `
+    <div style="font-size:13px;color:#7f8c8d;margin-bottom:14px;">
+      📞 ${escapeText(m.phone||'—')} • 📧 ${escapeText(m.email||'—')}${m.address ? ` • 🏠 ${escapeText(m.address)}` : ''}
+    </div>
+    <div class="stats-grid" style="margin-bottom:16px;gap:10px;">
+      <div class="stat-card checked"><div class="stat-label">Ngày liên tiếp</div><div class="stat-value">${d.streak}<span class="stat-suffix">ngày</span></div></div>
+      <div class="stat-card total"><div class="stat-label">Tổng đã dậy</div><div class="stat-value">${d.total_checked}<span class="stat-suffix">ngày</span></div></div>
+      <div class="stat-card missed"><div class="stat-label">Tổng chưa</div><div class="stat-value">${d.total_missed}<span class="stat-suffix">ngày</span></div></div>
+    </div>
+    <div class="card-title" style="font-size:14px;">📅 Ngày điểm danh gần đây ${d.archived_count ? `<span style="font-weight:400;font-size:12px;color:#95a5a6;">(+ ${d.archived_count} ngày đã lưu trữ — không còn chi tiết)</span>` : ''}</div>
+    <div style="margin:8px 0 16px;">${datesHtml}</div>
+    <div class="card-title" style="font-size:14px;">💳 Lịch sử thanh toán</div>
+    <div style="margin-top:8px;">${paysHtml}</div>
+  `;
 }
 
 // Modal sửa thành viên (tạo động)
@@ -617,7 +674,26 @@ async function loadRangeReport(from, to) {
 }
 async function reloadAllReports() {
   const date = validateReportDate(document.getElementById('rep-date').value);
-  await Promise.all([loadReportOverview(), loadReportDaily(date), loadReportDetailed(date)]);
+  await Promise.all([loadReportOverview(), loadReportDaily(date), loadReportDetailed(date), loadLeaderboard()]);
+}
+
+let lastLb = null;
+async function loadLeaderboard() {
+  const r = await api('GET', '/api/admin/reports/leaderboard?limit=20');
+  if (!r || !r.ok) return;
+  lastLb = r.data;
+  const fill = (tbodySel, list, valKey, suffix) => {
+    const tb = document.querySelector(tbodySel);
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:#95a5a6;">Chưa có dữ liệu</td></tr>'; return; }
+    const medal = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+    tb.innerHTML = list.map((x, i) => `<tr>
+      <td class="num">${medal(i)}</td>
+      <td>${escapeText(x.full_name)}</td>
+      <td class="num">${x[valKey]} ${suffix}</td>
+    </tr>`).join('');
+  };
+  fill('#lb-streak-table tbody', r.data.by_streak || [], 'streak', 'ngày');
+  fill('#lb-total-table tbody', r.data.by_total || [], 'total_checked', 'ngày');
 }
 
 function initReportsTab() {
@@ -674,6 +750,20 @@ function initReportsTab() {
       { key:'_', label:'STT', width:6 }, { key:'full_name', label:'Họ và tên', width:28 },
       { key:'phone', label:'Số điện thoại', width:16 }, { key:'email', label:'Email', width:30 },
       { key:'checked_days', label:`Số ngày điểm danh (${lastRange.total_days} ngày)`, width:26 }]);
+  });
+
+  // Xuất Excel bảng xếp hạng
+  document.getElementById('lb-streak-export').addEventListener('click', () => {
+    if (!lastLb) return alert('Chưa có dữ liệu');
+    exportToExcel(lastLb.by_streak, 'Top streak', 'top-streak.xlsx', [
+      { key:'_', label:'Hạng', width:8 }, { key:'full_name', label:'Họ và tên', width:28 },
+      { key:'phone', label:'Số điện thoại', width:16 }, { key:'streak', label:'Ngày liên tiếp', width:16 }]);
+  });
+  document.getElementById('lb-total-export').addEventListener('click', () => {
+    if (!lastLb) return alert('Chưa có dữ liệu');
+    exportToExcel(lastLb.by_total, 'Top tong ngay', 'top-tong-ngay.xlsx', [
+      { key:'_', label:'Hạng', width:8 }, { key:'full_name', label:'Họ và tên', width:28 },
+      { key:'phone', label:'Số điện thoại', width:16 }, { key:'total_checked', label:'Tổng ngày dậy', width:16 }]);
   });
 
   const wk = computeRange('week');

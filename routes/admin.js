@@ -250,68 +250,111 @@ router.get('/reports/daily', adminRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Helper: tính số liệu per-member (streak nối archive + tổng đã + tổng chưa)
+// Dùng chung cho /reports/detailed, /reports/leaderboard, /members/:id/detail
+async function computeMemberStats(date) {
+  const t = nowInTimezone();
+  const windowEnded = t.hour >= config.CHECKIN_END_HOUR; // qua 6h sáng = hôm nay đã đóng
+  const [r, archive] = await Promise.all([
+    query(`
+      SELECT m.id, m.full_name, m.phone, m.email, m.created_at,
+             COALESCE(ARRAY_AGG(c.check_date ORDER BY c.check_date DESC)
+                      FILTER (WHERE c.check_date IS NOT NULL), '{}'::text[]) AS dates
+      FROM members m
+      LEFT JOIN member_checkins c ON c.member_id = m.id
+      GROUP BY m.id
+      ORDER BY m.full_name
+    `),
+    loadArchive()
+  ]);
+
+  return r.rows.map(m => {
+    const dates = m.dates || [];
+    const set = new Set(dates);
+    const checkedToday = set.has(date);
+
+    // Dữ liệu đã lưu trữ của người này (theo SĐT): { count, last_date, tail_streak }
+    const arch = (m.phone && archive.by_phone[m.phone]) || { count: 0, last_date: null, tail_streak: 0 };
+
+    // isChecked: 1 ngày đã điểm danh nếu có trong live HOẶC nằm trong "đuôi liên tiếp" đã lưu trữ
+    // → streak nối liền xuyên qua mốc backup. Đuôi archive = [last_date - (tail_streak-1) .. last_date]
+    const archTailStart = arch.last_date ? addDays(arch.last_date, -(arch.tail_streak - 1)) : null;
+    const isChecked = (d) => set.has(d) || (arch.last_date && archTailStart && d <= arch.last_date && d >= archTailStart);
+
+    let cursor;
+    if (isChecked(date)) cursor = date;
+    else if (!windowEnded) cursor = addDays(date, -1);
+    else cursor = null;
+    let streak = 0;
+    while (cursor && isChecked(cursor)) { streak++; cursor = addDays(cursor, -1); }
+
+    const totalChecked = dates.length + (arch.count || 0);
+
+    const created = m.created_at ? m.created_at.toISOString().slice(0, 10) : date;
+    const firstDay = created > date ? date : created;
+    const lastEnded = windowEnded ? t.date : addDays(t.date, -1);
+    let totalMissed = 0;
+    if (firstDay <= lastEnded) {
+      const eligible = daysBetween(firstDay, lastEnded);
+      totalMissed = Math.max(0, eligible - totalChecked);
+    }
+
+    return {
+      id: m.id, full_name: m.full_name, phone: m.phone, email: m.email,
+      checked_today: checkedToday, streak,
+      total_checked: totalChecked, total_missed: totalMissed
+    };
+  });
+}
+
 // Báo cáo chi tiết: streak / tổng đã / tổng chưa
 router.get('/reports/detailed', adminRequired, async (req, res, next) => {
   try {
     const t = nowInTimezone();
     const date = validateDateParam(req.query.date, t.date);
-    const windowEnded = t.hour >= config.CHECKIN_END_HOUR; // qua 6h sáng = hôm nay đã đóng
-
-    const [r, archive] = await Promise.all([
-      query(`
-        SELECT m.id, m.full_name, m.phone, m.email, m.created_at,
-               COALESCE(ARRAY_AGG(c.check_date ORDER BY c.check_date DESC)
-                        FILTER (WHERE c.check_date IS NOT NULL), '{}'::text[]) AS dates
-        FROM members m
-        LEFT JOIN member_checkins c ON c.member_id = m.id
-        GROUP BY m.id
-        ORDER BY m.full_name
-      `),
-      loadArchive()
-    ]);
-
-    const rows = r.rows.map(m => {
-      const dates = m.dates || [];
-      const set = new Set(dates);
-      const checkedToday = set.has(date);
-
-      // Dữ liệu đã lưu trữ của người này (theo SĐT): { count, last_date, tail_streak }
-      const arch = (m.phone && archive.by_phone[m.phone]) || { count: 0, last_date: null, tail_streak: 0 };
-
-      // isChecked: coi 1 ngày là đã điểm danh nếu có trong live HOẶC nằm trong "đuôi liên tiếp" đã lưu trữ
-      // → streak nối liền xuyên qua mốc backup. Đuôi archive = [last_date - (tail_streak-1) .. last_date]
-      const archTailStart = arch.last_date ? addDays(arch.last_date, -(arch.tail_streak - 1)) : null;
-      const isChecked = (d) => set.has(d) || (arch.last_date && archTailStart && d <= arch.last_date && d >= archTailStart);
-
-      // streak: đếm ngược liên tiếp từ hôm nay (hoặc hôm qua nếu hôm nay chưa đóng cửa sổ)
-      let cursor;
-      if (isChecked(date)) cursor = date;
-      else if (!windowEnded) cursor = addDays(date, -1);
-      else cursor = null;
-      let streak = 0;
-      while (cursor && isChecked(cursor)) { streak++; cursor = addDays(cursor, -1); }
-
-      // Cộng dồn: tổng đã check = live + đã lưu trữ (theo SĐT)
-      const totalChecked = dates.length + (arch.count || 0);
-
-      // tổng chưa = số ngày eligible (từ ngày import) - tổng đã check (đã gồm archive)
-      const created = m.created_at ? m.created_at.toISOString().slice(0, 10) : date;
-      const firstDay = created > date ? date : created;
-      const lastEnded = windowEnded ? t.date : addDays(t.date, -1);
-      let totalMissed = 0;
-      if (firstDay <= lastEnded) {
-        const eligible = daysBetween(firstDay, lastEnded);
-        totalMissed = Math.max(0, eligible - totalChecked);
-      }
-
-      return {
-        full_name: m.full_name, phone: m.phone, email: m.email,
-        checked_today: checkedToday, streak,
-        total_checked: totalChecked, total_missed: totalMissed
-      };
-    });
+    const rows = await computeMemberStats(date);
     const checked = rows.filter(x => x.checked_today).length;
     res.json({ date, total: rows.length, checked, not_checked: rows.length - checked, rows });
+  } catch (err) { next(err); }
+});
+
+// Bảng xếp hạng: top streak + top tổng ngày dậy (cộng dồn archive)
+router.get('/reports/leaderboard', adminRequired, async (req, res, next) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10), 1), 100);
+    const stats = await computeMemberStats(nowInTimezone().date);
+    const by_streak = [...stats].sort((a, b) => b.streak - a.streak || b.total_checked - a.total_checked).slice(0, limit);
+    const by_total = [...stats].sort((a, b) => b.total_checked - a.total_checked || b.streak - a.streak).slice(0, limit);
+    res.json({ by_streak, by_total });
+  } catch (err) { next(err); }
+});
+
+// Chi tiết 1 thành viên: thông tin + ngày điểm danh gần đây + thanh toán + số liệu
+router.get('/members/:id/detail', adminRequired, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(404).json({ error: 'Không tìm thấy thành viên' });
+    const t = nowInTimezone();
+    const [memberRes, datesRes, paysRes, archive, stats] = await Promise.all([
+      query('SELECT id, full_name, phone, email, address, created_at FROM members WHERE id = $1', [id]),
+      query('SELECT check_date, check_time FROM member_checkins WHERE member_id = $1 ORDER BY check_date DESC LIMIT 60', [id]),
+      query('SELECT id, status, detected_banks, admin_note, created_at, confirmed_at FROM payments WHERE member_id = $1 ORDER BY created_at DESC LIMIT 30', [id]),
+      loadArchive(),
+      computeMemberStats(nowInTimezone().date)
+    ]);
+    const member = memberRes.rows[0];
+    if (!member) return res.status(404).json({ error: 'Không tìm thấy thành viên' });
+    const stat = stats.find(s => s.id === id) || { streak: 0, total_checked: 0, total_missed: 0 };
+    const arch = (member.phone && archive.by_phone[member.phone]) || { count: 0 };
+    res.json({
+      member,
+      recent_dates: datesRes.rows,           // ngày điểm danh live gần đây (60)
+      archived_count: arch.count || 0,        // số đã lưu trữ (không còn chi tiết ngày)
+      payments: paysRes.rows,
+      streak: stat.streak,
+      total_checked: stat.total_checked,
+      total_missed: stat.total_missed
+    });
   } catch (err) { next(err); }
 });
 

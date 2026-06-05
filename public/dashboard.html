@@ -224,6 +224,37 @@
         </div>
         <div style="position:relative;height:280px;"><canvas id="rep-chart"></canvas></div>
       </div>
+
+      <!-- 🏆 BẢNG XẾP HẠNG -->
+      <div class="card">
+        <div class="card-title">🏆 Bảng xếp hạng</div>
+        <div class="pay-grid">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-weight:600;">🔥 Top chuỗi liên tiếp</div>
+              <button class="btn-secondary" id="lb-streak-export" style="width:auto;padding:5px 12px;font-size:12px;">📥</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="report-table" id="lb-streak-table">
+                <thead><tr><th>#</th><th>Họ và tên</th><th>Ngày liên tiếp</th></tr></thead>
+                <tbody><tr><td colspan="3" style="text-align:center;padding:20px;color:#95a5a6;">Đang tải...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-weight:600;">⭐ Top tổng ngày dậy</div>
+              <button class="btn-secondary" id="lb-total-export" style="width:auto;padding:5px 12px;font-size:12px;">📥</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="report-table" id="lb-total-table">
+                <thead><tr><th>#</th><th>Họ và tên</th><th>Tổng ngày</th></tr></thead>
+                <tbody><tr><td colspan="3" style="text-align:center;padding:20px;color:#95a5a6;">Đang tải...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ============ SAO LƯU ============ -->
