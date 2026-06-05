@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Xem backup JSON - 5AM</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="dashboard-page">
+  <header class="topbar">
+    <div class="topbar-brand"><div class="topbar-brand-icon">5AM</div><span>Xem backup</span></div>
+    <a href="/dashboard.html" class="btn-logout" style="text-decoration:none;">← Quay lại</a>
+  </header>
+
+  <div class="container">
+    <div class="page-header">
+      <div class="page-title">Xem dữ liệu backup (offline)</div>
+      <div class="page-subtitle">Mở file JSON đã tải về để xem lại dữ liệu. Hoạt động hoàn toàn trên trình duyệt, không cần mạng/DB.</div>
+    </div>
+
+    <div class="card">
+      <input type="file" id="file" accept=".json,application/json" hidden>
+      <div class="drop-zone" id="drop" style="padding:30px;">
+        <label for="file" style="cursor:pointer;display:block;">
+          <div style="font-size:42px;margin-bottom:8px;">📂</div>
+          <div style="font-weight:600;">Chọn / kéo thả file backup .json</div>
+          <div style="font-size:12px;color:#7f8c8d;margin-top:4px;">vd: 5am-backup-20260604.json</div>
+        </label>
+      </div>
+      <div id="meta" style="margin-top:12px;font-size:13px;"></div>
+    </div>
+
+    <div id="content"></div>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function fmt(s){ try { return new Date(s).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}); } catch(e){ return s; } }
+
+    const drop = $('drop');
+    ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
+    ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('dragover');}));
+    drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) readFile(f); });
+    $('file').addEventListener('change',e=>{ if(e.target.files&&e.target.files[0]) readFile(e.target.files[0]); });
+
+    function readFile(file){
+      const reader = new FileReader();
+      reader.onload = e => {
+        try { render(JSON.parse(e.target.result)); }
+        catch(err){ $('meta').innerHTML = '<span style="color:#e74c3c;">File không hợp lệ: '+esc(err.message)+'</span>'; }
+      };
+      reader.readAsText(file);
+    }
+
+    function table(title, rows, cols){
+      if(!rows || !rows.length) return `<div class="card"><div class="card-title">${title}</div><div class="empty-state"><div>Không có dữ liệu</div></div></div>`;
+      const id = 'tbl-'+title.replace(/\W/g,'');
+      const head = cols.map(c=>`<th>${esc(c.label)}</th>`).join('');
+      const body = rows.map((r,i)=>`<tr>${cols.map(c=>`<td>${esc(typeof c.val==='function'?c.val(r,i):r[c.key])}</td>`).join('')}</tr>`).join('');
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div class="card-title" style="margin-bottom:0;">${title} <span class="badge sent">${rows.length}</span></div>
+          <input type="text" placeholder="🔍 Lọc..." oninput="filterTbl('${id}',this.value)" style="padding:6px 10px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:13px;">
+        </div>
+        <div style="overflow-x:auto;"><table class="report-table" id="${id}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>
+      </div>`;
+    }
+    function filterTbl(id,q){
+      q=q.toLowerCase();
+      document.querySelectorAll('#'+id+' tbody tr').forEach(tr=>{
+        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    }
+
+    function render(data){
+      const c = data.counts || {};
+      $('meta').innerHTML = `<b>✓ Đã mở backup</b> • Xuất lúc: ${fmt(data.exported_at)} • `
+        + `${c.members||0} thành viên • ${c.member_checkins||0} điểm danh (live) • ${c.payments||0} thanh toán`;
+
+      const archive = data.archive || {};
+      const archivedTotal = archive.total || 0;
+      const byPhone = archive.by_phone || {};
+
+      // Bảng tổng điểm danh mỗi thành viên = live + archive (theo SĐT)
+      const liveByPhone = {};
+      (data.member_checkins||[]).forEach(mc=>{ const p=mc.member_phone||''; liveByPhone[p]=(liveByPhone[p]||0)+1; });
+      const memberRows = (data.members||[]).map(m=>{
+        const live = liveByPhone[m.phone]||0;
+        const arch = byPhone[m.phone]||0;
+        return {...m, live_checkins: live, archived_checkins: arch, total_checkins: live+arch};
+      });
+
+      let html = '';
+      // Tóm tắt lưu trữ
+      html += `<div class="card"><div class="card-title">📦 Lưu trữ (cộng dồn)</div>
+        <div style="font-size:14px;">Tổng điểm danh đã lưu trữ: <b>${archivedTotal}</b> lượt${archive.cutoff?` • mốc dọn: trước ${esc(archive.cutoff)}`:''}${archive.updated_at?` • cập nhật: ${fmt(archive.updated_at)}`:''}</div>
+      </div>`;
+
+      html += table('👥 Thành viên (tổng điểm danh)', memberRows, [
+        {label:'Họ tên', key:'full_name'},
+        {label:'SĐT', key:'phone'},
+        {label:'Email', key:'email'},
+        {label:'Địa chỉ', key:'address'},
+        {label:'Live', key:'live_checkins'},
+        {label:'Đã lưu trữ', key:'archived_checkins'},
+        {label:'TỔNG', val:r=>r.total_checkins}
+      ]);
+
+      html += table('✅ Điểm danh (live)', data.member_checkins||[], [
+        {label:'SĐT', key:'member_phone'},
+        {label:'Ngày', key:'check_date'},
+        {label:'Giờ', key:'check_time'}
+      ]);
+
+      html += table('💳 Thanh toán', data.payments||[], [
+        {label:'#', key:'id'},
+        {label:'Họ tên', key:'full_name'},
+        {label:'SĐT', key:'phone'},
+        {label:'Email', key:'email'},
+        {label:'Trạng thái', val:r=> r.status==='confirmed'?'Đã xác nhận':r.status==='rejected'?'Từ chối':'Chờ'},
+        {label:'Ngày', val:r=>fmt(r.created_at)},
+        {label:'Ghi chú', key:'admin_note'}
+      ]);
+
+      $('content').innerHTML = html;
+    }
+  </script>
+</body>
+</html>

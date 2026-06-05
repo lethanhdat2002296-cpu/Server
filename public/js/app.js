@@ -116,6 +116,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     if (target === 'members') { initMembersTab(); loadMembers(); }
     if (target === 'payments') { initPaymentsTab(); loadPayments(); }
     if (target === 'reports') initReportsTab();
+    if (target === 'backup') { initBackupTab(); loadBackupStatus(); }
     if (target === 'settings') { initSettingsTab(); loadProfile(); }
   });
 });
@@ -727,6 +728,64 @@ async function loadProfile() {
   const form = document.getElementById('profile-form');
   form.full_name.value = r.data.user.full_name;
   form.email.value = r.data.user.email;
+}
+
+// ============================================================
+//  SAO LƯU & LƯU TRỮ
+// ============================================================
+let backupInitialized = false;
+function initBackupTab() {
+  if (backupInitialized) return;
+  backupInitialized = true;
+  document.getElementById('bk-export').addEventListener('click', exportBackup);
+  document.getElementById('bk-archive').addEventListener('click', doArchive);
+}
+
+async function loadBackupStatus() {
+  const r = await api('GET', '/api/admin/archive');
+  if (!r || !r.ok) return;
+  const live = r.data.live_checkins || 0;
+  const arch = r.data.archived_total || 0;
+  document.getElementById('bk-live').textContent = live;
+  document.getElementById('bk-archived').textContent = arch;
+  document.getElementById('bk-total').textContent = live + arch;
+  document.getElementById('bk-updated').textContent = r.data.updated_at
+    ? `Lần lưu trữ gần nhất: ${new Date(r.data.updated_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} • ${r.data.archived_members} thành viên trong kho`
+    : 'Chưa lưu trữ lần nào.';
+}
+
+async function exportBackup() {
+  const btn = document.getElementById('bk-export');
+  btn.disabled = true; btn.textContent = 'Đang tạo...';
+  const r = await api('GET', '/api/admin/backup');
+  if (r && r.ok) {
+    const blob = new Blob([JSON.stringify(r.data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    a.href = url;
+    a.download = `5am-backup-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast('success', 'Đã tải backup', `${r.data.counts.member_checkins} điểm danh, ${r.data.counts.members} thành viên`);
+  } else {
+    showToast('error', 'Lỗi', r?.data?.error || '');
+  }
+  btn.disabled = false; btn.textContent = '📥 Tải backup JSON';
+}
+
+async function doArchive() {
+  if (!confirm('LƯU TRỮ & DỌN DB?\n\nGộp toàn bộ điểm danh TRƯỚC hôm nay vào kho (giữ tổng), rồi xóa khỏi DB.\nBáo cáo vẫn hiện tổng cộng dồn.\n\nĐã tải backup JSON chưa? Thao tác này không hoàn tác được.')) return;
+  const btn = document.getElementById('bk-archive');
+  btn.disabled = true; btn.textContent = 'Đang lưu trữ...';
+  const r = await api('POST', '/api/admin/archive');
+  if (r && r.ok) {
+    showMsg('bk-msg', 'success', '✓ ' + r.data.message);
+    loadBackupStatus();
+  } else {
+    showMsg('bk-msg', 'error', r?.data?.error || 'Lỗi');
+  }
+  btn.disabled = false; btn.textContent = '📦 Lưu trữ & dọn DB';
 }
 
 // ============ INIT ============

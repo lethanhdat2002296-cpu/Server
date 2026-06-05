@@ -25,6 +25,23 @@ function validateDateParam(input, fallback) {
   return input;
 }
 
+// Đọc dữ liệu lưu trữ cộng dồn (archive). Trả object an toàn kể cả khi rỗng.
+async function loadArchive() {
+  try {
+    const r = await query('SELECT payload FROM archive_data WHERE id = 1');
+    const p = (r.rows[0] && r.rows[0].payload) || {};
+    return {
+      total: p.total || 0,
+      by_phone: p.by_phone || {},   // { phone: count } - tổng điểm danh đã archive theo SĐT
+      by_date: p.by_date || {},     // { 'YYYY-MM-DD': count } - cho biểu đồ
+      updated_at: p.updated_at || null,
+      cutoff: p.cutoff || null
+    };
+  } catch (e) {
+    return { total: 0, by_phone: {}, by_date: {}, updated_at: null, cutoff: null };
+  }
+}
+
 // ============================================================
 //  THANH TOÁN (admin duyệt)
 // ============================================================
@@ -181,13 +198,17 @@ router.get('/reports/overview', adminRequired, async (req, res, next) => {
     for (const row of payRes.rows) payments[row.status] = row.c;
     const total = membersRes.rows[0].c;
     const checked = todayRes.rows[0].c;
+    const archive = await loadArchive();
     res.json({
       date: t.date,
       server_time: `${t.date} ${t.time}`,
       total_members: total,
       checked_in_today: checked,
       not_checked_today: Math.max(0, total - checked),
-      total_checkins_all_time: totalRes.rows[0].c,
+      // TỔNG = live + lưu trữ (cộng dồn)
+      total_checkins_all_time: totalRes.rows[0].c + archive.total,
+      total_checkins_live: totalRes.rows[0].c,
+      total_checkins_archived: archive.total,
       payments
     });
   } catch (err) { next(err); }
@@ -221,15 +242,18 @@ router.get('/reports/detailed', adminRequired, async (req, res, next) => {
     const date = validateDateParam(req.query.date, t.date);
     const windowEnded = t.hour >= config.CHECKIN_END_HOUR; // qua 6h sáng = hôm nay đã đóng
 
-    const r = await query(`
-      SELECT m.id, m.full_name, m.phone, m.email, m.created_at,
-             COALESCE(ARRAY_AGG(c.check_date ORDER BY c.check_date DESC)
-                      FILTER (WHERE c.check_date IS NOT NULL), '{}'::text[]) AS dates
-      FROM members m
-      LEFT JOIN member_checkins c ON c.member_id = m.id
-      GROUP BY m.id
-      ORDER BY m.full_name
-    `);
+    const [r, archive] = await Promise.all([
+      query(`
+        SELECT m.id, m.full_name, m.phone, m.email, m.created_at,
+               COALESCE(ARRAY_AGG(c.check_date ORDER BY c.check_date DESC)
+                        FILTER (WHERE c.check_date IS NOT NULL), '{}'::text[]) AS dates
+        FROM members m
+        LEFT JOIN member_checkins c ON c.member_id = m.id
+        GROUP BY m.id
+        ORDER BY m.full_name
+      `),
+      loadArchive()
+    ]);
 
     const rows = r.rows.map(m => {
       const dates = m.dates || [];
@@ -244,21 +268,24 @@ router.get('/reports/detailed', adminRequired, async (req, res, next) => {
       let streak = 0;
       while (cursor && set.has(cursor)) { streak++; cursor = addDays(cursor, -1); }
 
-      // tổng chưa = số ngày eligible (từ ngày import) - số ngày đã check
+      // Cộng dồn: tổng đã check = live + đã lưu trữ (theo SĐT)
+      const archivedCount = (m.phone && archive.by_phone[m.phone]) || 0;
+      const totalChecked = dates.length + archivedCount;
+
+      // tổng chưa = số ngày eligible (từ ngày import) - tổng đã check (đã gồm archive)
       const created = m.created_at ? m.created_at.toISOString().slice(0, 10) : date;
       const firstDay = created > date ? date : created;
       const lastEnded = windowEnded ? t.date : addDays(t.date, -1);
       let totalMissed = 0;
       if (firstDay <= lastEnded) {
         const eligible = daysBetween(firstDay, lastEnded);
-        const inRange = dates.filter(d => d >= firstDay && d <= lastEnded).length;
-        totalMissed = Math.max(0, eligible - inRange);
+        totalMissed = Math.max(0, eligible - totalChecked);
       }
 
       return {
         full_name: m.full_name, phone: m.phone, email: m.email,
         checked_today: checkedToday, streak,
-        total_checked: dates.length, total_missed: totalMissed
+        total_checked: totalChecked, total_missed: totalMissed
       };
     });
     const checked = rows.filter(x => x.checked_today).length;
@@ -275,14 +302,15 @@ router.get('/reports/range', adminRequired, async (req, res, next) => {
     if (from > to) { const tmp = from; from = to; to = tmp; }
     if (daysBetween(from, to) > 92) from = addDays(to, -91);
 
-    const [dailyRes, perMemberRes, totalRes] = await Promise.all([
+    const [dailyRes, perMemberRes, totalRes, archive] = await Promise.all([
       query(`SELECT check_date, COUNT(*)::int AS c FROM member_checkins
              WHERE check_date BETWEEN $1 AND $2 GROUP BY check_date ORDER BY check_date`, [from, to]),
       query(`SELECT m.full_name, m.phone, m.email, COUNT(c.id)::int AS checked_days
              FROM members m
              LEFT JOIN member_checkins c ON c.member_id = m.id AND c.check_date BETWEEN $1 AND $2
              GROUP BY m.id ORDER BY checked_days DESC, m.full_name`, [from, to]),
-      query('SELECT COUNT(*)::int AS c FROM members')
+      query('SELECT COUNT(*)::int AS c FROM members'),
+      loadArchive()
     ]);
 
     const countMap = {};
@@ -290,7 +318,12 @@ router.get('/reports/range', adminRequired, async (req, res, next) => {
     const totalDays = daysBetween(from, to);
     const daily = [];
     let cursor = from;
-    for (let d = 0; d < totalDays; d++) { daily.push({ date: cursor, count: countMap[cursor] || 0 }); cursor = addDays(cursor, 1); }
+    for (let d = 0; d < totalDays; d++) {
+      // Cộng dồn số liệu đã lưu trữ vào biểu đồ theo ngày
+      const archived = archive.by_date[cursor] || 0;
+      daily.push({ date: cursor, count: (countMap[cursor] || 0) + archived });
+      cursor = addDays(cursor, 1);
+    }
 
     res.json({
       from, to, total_days: totalDays,
@@ -309,6 +342,104 @@ router.get('/audit-log', adminRequired, async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 200);
     const r = await query('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT $1', [limit]);
     res.json({ logs: r.rows });
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+//  SAO LƯU & LƯU TRỮ (archive overlay)
+// ============================================================
+
+// Tải toàn bộ dữ liệu ra JSON (bản sao lưu đầy đủ để giữ ngoài)
+router.get('/backup', adminRequired, async (req, res, next) => {
+  try {
+    const [members, checkins, payments, audit, archive] = await Promise.all([
+      query('SELECT * FROM members ORDER BY id'),
+      query('SELECT mc.*, m.phone AS member_phone FROM member_checkins mc JOIN members m ON m.id = mc.member_id ORDER BY mc.check_date'),
+      query('SELECT * FROM payments ORDER BY id'),
+      query('SELECT * FROM audit_log ORDER BY id'),
+      query('SELECT payload FROM archive_data WHERE id = 1')
+    ]);
+    res.json({
+      version: 1,
+      exported_at: new Date().toISOString(),
+      counts: {
+        members: members.rows.length,
+        member_checkins: checkins.rows.length,
+        payments: payments.rows.length
+      },
+      members: members.rows,
+      member_checkins: checkins.rows,
+      payments: payments.rows,
+      audit_log: audit.rows,
+      archive: (archive.rows[0] && archive.rows[0].payload) || {}
+    });
+  } catch (err) { next(err); }
+});
+
+// Trạng thái lưu trữ hiện tại
+router.get('/archive', adminRequired, async (req, res, next) => {
+  try {
+    const archive = await loadArchive();
+    const liveRes = await query('SELECT COUNT(*)::int AS c FROM member_checkins');
+    res.json({
+      archived_total: archive.total,
+      archived_members: Object.keys(archive.by_phone).length,
+      archived_dates: Object.keys(archive.by_date).length,
+      updated_at: archive.updated_at,
+      cutoff: archive.cutoff,
+      live_checkins: liveRes.rows[0].c
+    });
+  } catch (err) { next(err); }
+});
+
+// LƯU TRỮ & DỌN: gộp điểm danh CŨ (trước hôm nay) vào archive, xóa khỏi DB
+// Giữ lại điểm danh hôm nay (live). Cộng dồn vào payload cũ.
+router.post('/archive', adminRequired, async (req, res, next) => {
+  try {
+    const t = nowInTimezone();
+    const cutoff = t.date; // archive tất cả check_date < hôm nay
+
+    // Aggregate phần sắp dọn
+    const [byPhoneRes, byDateRes, totalRes] = await Promise.all([
+      query(`SELECT m.phone, COUNT(*)::int AS c
+             FROM member_checkins mc JOIN members m ON m.id = mc.member_id
+             WHERE mc.check_date < $1 AND m.phone <> '' GROUP BY m.phone`, [cutoff]),
+      query(`SELECT check_date, COUNT(*)::int AS c FROM member_checkins
+             WHERE check_date < $1 GROUP BY check_date`, [cutoff]),
+      query('SELECT COUNT(*)::int AS c FROM member_checkins WHERE check_date < $1', [cutoff])
+    ]);
+    const toArchive = totalRes.rows[0].c;
+    if (toArchive === 0) {
+      return res.json({ ok: true, archived_now: 0, message: 'Không có dữ liệu cũ để lưu trữ (chỉ có dữ liệu hôm nay).' });
+    }
+
+    // Gộp vào payload cũ
+    const old = await loadArchive();
+    const by_phone = { ...old.by_phone };
+    for (const row of byPhoneRes.rows) by_phone[row.phone] = (by_phone[row.phone] || 0) + row.c;
+    const by_date = { ...old.by_date };
+    for (const row of byDateRes.rows) by_date[row.check_date] = (by_date[row.check_date] || 0) + row.c;
+    const payload = {
+      total: old.total + toArchive,
+      by_phone, by_date,
+      cutoff,
+      updated_at: new Date().toISOString()
+    };
+
+    // Lưu payload + xóa rows cũ
+    await query(`
+      INSERT INTO archive_data (id, payload, updated_at) VALUES (1, $1::jsonb, NOW())
+      ON CONFLICT (id) DO UPDATE SET payload = $1::jsonb, updated_at = NOW()
+    `, [JSON.stringify(payload)]);
+    await query('DELETE FROM member_checkins WHERE check_date < $1', [cutoff]);
+
+    await logAudit(req.user, 'archive', `${toArchive} điểm danh`, `cutoff ${cutoff}`);
+    res.json({
+      ok: true,
+      archived_now: toArchive,
+      archived_total: payload.total,
+      message: `Đã lưu trữ & dọn ${toArchive} lượt điểm danh cũ. Tổng số liệu vẫn hiển thị đầy đủ.`
+    });
   } catch (err) { next(err); }
 });
 

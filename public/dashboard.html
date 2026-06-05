@@ -23,6 +23,7 @@
     <button class="nav-tab" data-page="members">👥 Thành viên</button>
     <button class="nav-tab" data-page="payments">💳 Thanh toán</button>
     <button class="nav-tab" data-page="reports">📊 Báo cáo</button>
+    <button class="nav-tab" data-page="backup">💾 Sao lưu</button>
     <button class="nav-tab" data-page="settings">⚙ Cài đặt</button>
   </nav>
 
@@ -219,6 +220,51 @@
           <button class="btn-secondary" id="rep-range-apply" style="width:auto;padding:8px 16px;font-size:13px;">Áp dụng</button>
         </div>
         <div style="position:relative;height:280px;"><canvas id="rep-chart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ============ SAO LƯU ============ -->
+    <section id="page-backup" class="page">
+      <div class="page-header">
+        <div class="page-title">Sao lưu & Lưu trữ</div>
+        <div class="page-subtitle">Backup dữ liệu ra JSON, dọn nhẹ DB mà vẫn giữ tổng số liệu (cộng dồn)</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 Trạng thái</div>
+        <div class="stats-grid" style="margin-bottom:0;">
+          <div class="stat-card"><div class="stat-label">Điểm danh trong DB (live)</div><div class="stat-value"><span id="bk-live">0</span><span class="stat-suffix">lượt</span></div></div>
+          <div class="stat-card total"><div class="stat-label">Đã lưu trữ (archive)</div><div class="stat-value"><span id="bk-archived">0</span><span class="stat-suffix">lượt</span></div></div>
+          <div class="stat-card checked"><div class="stat-label">Tổng hiển thị</div><div class="stat-value"><span id="bk-total">0</span><span class="stat-suffix">lượt</span></div></div>
+        </div>
+        <div id="bk-updated" style="font-size:13px;color:#7f8c8d;margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">1️⃣ Sao lưu (khuyến nghị làm trước)</div>
+        <p style="font-size:13px;color:#7f8c8d;margin-bottom:14px;">
+          Tải toàn bộ dữ liệu (thành viên, điểm danh, thanh toán) ra 1 file JSON để giữ ngoài máy.
+          Mở lại bằng trang xem offline bất cứ lúc nào.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-primary" id="bk-export" style="width:auto;padding:10px 18px;">📥 Tải backup JSON</button>
+          <a href="/backup-viewer.html" target="_blank" class="btn-secondary" style="width:auto;padding:10px 18px;display:inline-flex;align-items:center;text-decoration:none;">📂 Mở trang xem backup</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">2️⃣ Lưu trữ & dọn DB (giải phóng dung lượng)</div>
+        <p style="font-size:13px;color:#7f8c8d;margin-bottom:6px;">
+          Gộp toàn bộ điểm danh <b>trước hôm nay</b> vào kho lưu trữ (chỉ giữ con số tổng), rồi xóa các dòng cũ khỏi DB để nhẹ.
+        </p>
+        <p style="font-size:13px;color:#00b894;margin-bottom:14px;">
+          ✓ Báo cáo vẫn hiện <b>TỔNG = live + đã lưu trữ</b> (cộng dồn). Ví dụ: 5 lượt đã lưu trữ + 2 lượt mới = hiện 7.
+        </p>
+        <div style="background:#fff3cd;color:#856404;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;">
+          ⚠ Nên bấm "Tải backup JSON" ở trên TRƯỚC khi lưu trữ. Thao tác này xóa dòng điểm danh cũ khỏi DB (không thể hoàn tác).
+        </div>
+        <button class="btn-reject" id="bk-archive" style="width:auto;padding:10px 18px;border-radius:8px;font-weight:600;">📦 Lưu trữ & dọn DB</button>
+        <div id="bk-msg" class="message" style="margin-top:12px;"></div>
       </div>
     </section>
 
