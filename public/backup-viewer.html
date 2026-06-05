@@ -87,7 +87,8 @@
       (data.member_checkins||[]).forEach(mc=>{ const p=mc.member_phone||''; liveByPhone[p]=(liveByPhone[p]||0)+1; });
       const memberRows = (data.members||[]).map(m=>{
         const live = liveByPhone[m.phone]||0;
-        const arch = byPhone[m.phone]||0;
+        const ae = byPhone[m.phone];
+        const arch = typeof ae==='number' ? ae : (ae && ae.count) || 0;
         return {...m, live_checkins: live, archived_checkins: arch, total_checkins: live+arch};
       });
 

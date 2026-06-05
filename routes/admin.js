@@ -26,13 +26,19 @@ function validateDateParam(input, fallback) {
 }
 
 // Đọc dữ liệu lưu trữ cộng dồn (archive). Trả object an toàn kể cả khi rỗng.
+// by_phone chuẩn hóa: { phone: { count, last_date, tail_streak } }
 async function loadArchive() {
   try {
     const r = await query('SELECT payload FROM archive_data WHERE id = 1');
     const p = (r.rows[0] && r.rows[0].payload) || {};
+    const by_phone = {};
+    for (const [phone, v] of Object.entries(p.by_phone || {})) {
+      if (typeof v === 'number') by_phone[phone] = { count: v, last_date: null, tail_streak: 0 };
+      else by_phone[phone] = { count: v.count || 0, last_date: v.last_date || null, tail_streak: v.tail_streak || 0 };
+    }
     return {
       total: p.total || 0,
-      by_phone: p.by_phone || {},   // { phone: count } - tổng điểm danh đã archive theo SĐT
+      by_phone,
       by_date: p.by_date || {},     // { 'YYYY-MM-DD': count } - cho biểu đồ
       updated_at: p.updated_at || null,
       cutoff: p.cutoff || null
@@ -260,17 +266,24 @@ router.get('/reports/detailed', adminRequired, async (req, res, next) => {
       const set = new Set(dates);
       const checkedToday = set.has(date);
 
+      // Dữ liệu đã lưu trữ của người này (theo SĐT): { count, last_date, tail_streak }
+      const arch = (m.phone && archive.by_phone[m.phone]) || { count: 0, last_date: null, tail_streak: 0 };
+
+      // isChecked: coi 1 ngày là đã điểm danh nếu có trong live HOẶC nằm trong "đuôi liên tiếp" đã lưu trữ
+      // → streak nối liền xuyên qua mốc backup. Đuôi archive = [last_date - (tail_streak-1) .. last_date]
+      const archTailStart = arch.last_date ? addDays(arch.last_date, -(arch.tail_streak - 1)) : null;
+      const isChecked = (d) => set.has(d) || (arch.last_date && archTailStart && d <= arch.last_date && d >= archTailStart);
+
       // streak: đếm ngược liên tiếp từ hôm nay (hoặc hôm qua nếu hôm nay chưa đóng cửa sổ)
       let cursor;
-      if (set.has(date)) cursor = date;
+      if (isChecked(date)) cursor = date;
       else if (!windowEnded) cursor = addDays(date, -1);
       else cursor = null;
       let streak = 0;
-      while (cursor && set.has(cursor)) { streak++; cursor = addDays(cursor, -1); }
+      while (cursor && isChecked(cursor)) { streak++; cursor = addDays(cursor, -1); }
 
       // Cộng dồn: tổng đã check = live + đã lưu trữ (theo SĐT)
-      const archivedCount = (m.phone && archive.by_phone[m.phone]) || 0;
-      const totalChecked = dates.length + archivedCount;
+      const totalChecked = dates.length + (arch.count || 0);
 
       // tổng chưa = số ngày eligible (từ ngày import) - tổng đã check (đã gồm archive)
       const created = m.created_at ? m.created_at.toISOString().slice(0, 10) : date;
@@ -399,11 +412,12 @@ router.post('/archive', adminRequired, async (req, res, next) => {
     const t = nowInTimezone();
     const cutoff = t.date; // archive tất cả check_date < hôm nay
 
-    // Aggregate phần sắp dọn
-    const [byPhoneRes, byDateRes, totalRes] = await Promise.all([
-      query(`SELECT m.phone, COUNT(*)::int AS c
+    // Lấy từng (SĐT, ngày) sắp dọn để tính số đếm + đuôi streak
+    const [rowsRes, byDateRes, totalRes] = await Promise.all([
+      query(`SELECT m.phone, mc.check_date
              FROM member_checkins mc JOIN members m ON m.id = mc.member_id
-             WHERE mc.check_date < $1 AND m.phone <> '' GROUP BY m.phone`, [cutoff]),
+             WHERE mc.check_date < $1 AND m.phone <> ''
+             ORDER BY m.phone, mc.check_date`, [cutoff]),
       query(`SELECT check_date, COUNT(*)::int AS c FROM member_checkins
              WHERE check_date < $1 GROUP BY check_date`, [cutoff]),
       query('SELECT COUNT(*)::int AS c FROM member_checkins WHERE check_date < $1', [cutoff])
@@ -413,12 +427,33 @@ router.post('/archive', adminRequired, async (req, res, next) => {
       return res.json({ ok: true, archived_now: 0, message: 'Không có dữ liệu cũ để lưu trữ (chỉ có dữ liệu hôm nay).' });
     }
 
-    // Gộp vào payload cũ
+    // Gom ngày theo SĐT
+    const newByPhone = {}; // phone -> [dates asc, unique]
+    for (const row of rowsRes.rows) {
+      (newByPhone[row.phone] = newByPhone[row.phone] || []).push(row.check_date);
+    }
+
     const old = await loadArchive();
     const by_phone = { ...old.by_phone };
-    for (const row of byPhoneRes.rows) by_phone[row.phone] = (by_phone[row.phone] || 0) + row.c;
+    for (const [phone, rawDates] of Object.entries(newByPhone)) {
+      const dates = [...new Set(rawDates)].sort(); // asc
+      const newCount = dates.length;
+      const newMax = dates[dates.length - 1];
+      // Đuôi liên tiếp kết thúc ở newMax
+      let run = 1, i = dates.length - 1;
+      while (i > 0 && dates[i - 1] === addDays(dates[i], -1)) { run++; i--; }
+      const newTailStart = dates[i];
+
+      const oldE = by_phone[phone] || { count: 0, last_date: null, tail_streak: 0 };
+      // Nối đuôi nếu batch mới bắt đầu ngay sau ngày cuối của archive cũ
+      let tail = run;
+      if (oldE.last_date && newTailStart === addDays(oldE.last_date, 1)) tail = run + oldE.tail_streak;
+      by_phone[phone] = { count: oldE.count + newCount, last_date: newMax, tail_streak: tail };
+    }
+
     const by_date = { ...old.by_date };
     for (const row of byDateRes.rows) by_date[row.check_date] = (by_date[row.check_date] || 0) + row.c;
+
     const payload = {
       total: old.total + toArchive,
       by_phone, by_date,
