@@ -25,6 +25,7 @@
     <button class="nav-tab" data-page="reports">📊 Báo cáo</button>
     <button class="nav-tab" data-page="backup">💾 Sao lưu</button>
     <button class="nav-tab" data-page="settings">⚙ Cài đặt</button>
+    <button class="nav-tab" data-page="guide">📖 Hướng dẫn</button>
   </nav>
 
   <div class="container">
@@ -347,6 +348,109 @@
           <div id="password-msg" class="message"></div>
           <button type="submit" class="btn-primary" style="max-width:200px;">Đổi mật khẩu</button>
         </form>
+      </div>
+    </section>
+
+    <!-- ============ HƯỚNG DẪN SỬ DỤNG ============ -->
+    <section id="page-guide" class="page">
+      <div class="page-header">
+        <div class="page-title">📖 Hướng dẫn sử dụng</div>
+        <div class="page-subtitle">Đọc 1 lần để nắm cách vận hành hệ thống. Bấm từng mục bên dưới để xem chi tiết.</div>
+      </div>
+
+      <!-- Tổng quan -->
+      <div class="card">
+        <div class="card-title">🌅 Hệ thống làm gì?</div>
+        <p style="font-size:14px;line-height:1.7;">
+          Đây là hệ thống <b>điểm danh dậy sớm 5h</b> + <b>thu phí thành viên</b>. Quy trình hằng ngày:
+        </p>
+        <ol style="font-size:14px;line-height:1.9;padding-left:20px;">
+          <li><b>Admin import danh sách</b> thành viên từ file Excel (1 lần đầu, cập nhật khi có người mới).</li>
+          <li><b>Mỗi sáng 5:00–5:59</b>, admin mở tab Điểm danh, tích những người có mặt.</li>
+          <li><b>Thành viên gửi biên lai</b> chuyển phí qua 1 trang web công khai (không cần đăng nhập).</li>
+          <li><b>Admin duyệt</b> biên lai → hệ thống tự gửi email xác nhận cho thành viên.</li>
+          <li><b>Xem báo cáo</b>, bảng xếp hạng, và <b>sao lưu</b> dữ liệu định kỳ.</li>
+        </ol>
+        <div class="callout info">💡 Chỉ <b>admin</b> đăng nhập trang này. Thành viên KHÔNG có tài khoản — họ chỉ vào trang gửi biên lai.</div>
+      </div>
+
+      <!-- Thành viên -->
+      <div class="card">
+        <div class="card-title">👥 Thành viên — Import & quản lý</div>
+        <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
+          <li><b>Import Excel:</b> vào tab Thành viên → "Chọn file Excel". File cần có dòng tiêu đề với các cột: <b>Họ tên</b>, <b>Số điện thoại</b> (hoặc SĐT/Sđth), <b>Email</b>, <b>Địa chỉ</b>. Bấm "📥 Tải file mẫu" để lấy mẫu chuẩn.</li>
+          <li><b>Trùng thì cập nhật:</b> hệ thống dò theo <b>số điện thoại</b> — SĐT đã có thì cập nhật thông tin, chưa có thì thêm mới. Import lại nhiều lần không bị nhân đôi.</li>
+          <li><b>👁 Xem:</b> bấm để xem chi tiết 1 người — chuỗi ngày liên tiếp, tổng ngày dậy, lịch sử điểm danh & thanh toán.</li>
+          <li><b>✏ Sửa / 🗑 Xóa:</b> sửa thông tin hoặc xóa từng người. "🗑 Xóa toàn bộ" để làm sạch trước khi import danh sách mới.</li>
+        </ul>
+        <div class="callout warn">⚠ Số điện thoại là "chìa khóa" để nhận diện. Nên đảm bảo mỗi người 1 SĐT đúng và duy nhất.</div>
+      </div>
+
+      <!-- Điểm danh -->
+      <div class="card">
+        <div class="card-title">✅ Điểm danh — Quy tắc 5:00–5:59</div>
+        <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
+          <li><b>Chỉ điểm danh được từ 5:00 đến 5:59 sáng.</b> Ngoài giờ này chỉ xem được, không tích được (nút bị khóa, có banner báo).</li>
+          <li>Trong giờ: tích ô vuông cạnh tên người có mặt. Bỏ tích nếu nhầm. Mỗi thao tác lưu kèm giờ.</li>
+          <li><b>✅ Tích tất cả / ⬜ Bỏ tất cả:</b> thao tác nhanh cho cả danh sách. <b>Nếu đang gõ ô tìm kiếm</b>, nút này chỉ áp dụng cho nhóm đang lọc (an toàn, không đụng người khác).</li>
+          <li><b>📥 Xuất Excel hôm nay:</b> tải danh sách ai có mặt / vắng sáng nay.</li>
+        </ul>
+        <div class="callout info">💡 Muốn đổi khung giờ (vd test ban ngày): vào Vercel → Settings → Environment Variables → đổi <code>CHECKIN_START_HOUR</code> sang giờ hiện tại, redeploy. Xong nhớ đổi lại 5.</div>
+      </div>
+
+      <!-- Thanh toán -->
+      <div class="card">
+        <div class="card-title">💳 Thanh toán — Duyệt biên lai</div>
+        <p style="font-size:14px;line-height:1.7;"><b>Thành viên gửi biên lai thế nào:</b></p>
+        <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
+          <li>Mở link công khai: <b><span id="guide-pay-link">.../payment.html</span></b> (gửi link này cho cả nhóm).</li>
+          <li>Gõ tên → chọn đúng tên → <b>nhập 4 số cuối SĐT</b> để xác minh → tự điền thông tin → đính ảnh biên lai → gửi.</li>
+          <li>Họ tự xem trạng thái duyệt ở cột "Lịch sử" bên trái cùng trang.</li>
+        </ul>
+        <p style="font-size:14px;line-height:1.7;"><b>Admin xử lý (tab Thanh toán):</b></p>
+        <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
+          <li>Lọc theo trạng thái (Chờ / Đã duyệt / Từ chối) hoặc tìm theo tên/SĐT/email.</li>
+          <li><b>✓ Duyệt</b> hoặc <b>✗ Từ chối</b> (kèm ghi chú) → hệ thống tự gửi email kết quả cho thành viên.</li>
+          <li>Nếu email gửi lỗi → có badge "📧 Email lỗi" + nút "Gửi lại".</li>
+          <li>Badge "⚠ Chưa khớp TV" = biên lai không gắn với thành viên nào (hiếm, kiểm tra lại).</li>
+        </ul>
+      </div>
+
+      <!-- Báo cáo -->
+      <div class="card">
+        <div class="card-title">📊 Báo cáo & 🏆 Xếp hạng</div>
+        <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
+          <li><b>Báo cáo tổng:</b> tổng thành viên, đã/chưa điểm danh hôm nay, tổng lượt điểm danh.</li>
+          <li><b>Báo cáo nhanh:</b> danh sách ai có mặt theo từng ngày (chọn ngày).</li>
+          <li><b>Báo cáo chi tiết:</b> mỗi người — số ngày liên tiếp (streak), tổng đã dậy, tổng chưa dậy.</li>
+          <li><b>Xu hướng:</b> biểu đồ cột số lượt điểm danh theo ngày (7 ngày / tháng / tùy chọn).</li>
+          <li><b>🏆 Bảng xếp hạng:</b> top chuỗi liên tiếp + top tổng ngày dậy nhiều nhất.</li>
+          <li>Mọi báo cáo đều có nút <b>📥 Xuất Excel</b>.</li>
+        </ul>
+        <div class="callout info">💡 "Số ngày liên tiếp" reset về 0 khi quên điểm danh 1 ngày; được giữ liền mạch kể cả sau khi sao lưu/dọn DB.</div>
+      </div>
+
+      <!-- Sao lưu -->
+      <div class="card">
+        <div class="card-title">💾 Sao lưu & Lưu trữ (khi DB gần đầy)</div>
+        <ol style="font-size:14px;line-height:1.9;padding-left:20px;">
+          <li><b>📥 Tải backup JSON:</b> luôn làm bước này TRƯỚC để giữ 1 bản sao đầy đủ ngoài máy.</li>
+          <li><b>📦 Lưu trữ & dọn DB:</b> gộp điểm danh cũ thành con số tổng (giữ nguyên tổng & chuỗi liên tiếp) rồi xóa dòng cũ → DB nhẹ đi rất nhiều. Báo cáo vẫn hiện <b>tổng = mới + đã lưu trữ</b>.</li>
+          <li><b>📂 Mở trang xem backup:</b> mở file JSON đã tải để xem lại dữ liệu offline, không cần mạng.</li>
+          <li><b>♻ Khôi phục từ JSON:</b> dùng khi chuyển sang DB Neon mới (DB cũ đầy) — tải file backup lên để nạp lại toàn bộ.</li>
+        </ol>
+        <div class="callout warn">⚠ "Lưu trữ & dọn" và "Khôi phục" sẽ xóa/ghi đè dữ liệu — luôn tải backup JSON trước khi làm.</div>
+      </div>
+
+      <!-- Cài đặt + FAQ -->
+      <div class="card">
+        <div class="card-title">⚙ Cài đặt & Câu hỏi thường gặp</div>
+        <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
+          <li><b>Đổi mật khẩu / email admin:</b> vào tab Cài đặt. Quên mật khẩu → dùng "Quên mật khẩu?" ở trang đăng nhập (mã gửi qua email admin).</li>
+          <li><b>Thêm admin mới:</b> chạy lệnh <code>npm run create-admin &lt;tên&gt; &lt;mật khẩu&gt;</code> trên máy (cần file .env có DATABASE_URL).</li>
+          <li><b>Thành viên không gửi được biên lai?</b> Kiểm tra họ đã được import chưa (đúng SĐT), và nhập đúng 4 số cuối SĐT khi xác minh.</li>
+          <li><b>Email xác nhận không tới?</b> Kiểm tra cấu hình SMTP trên Vercel (SMTP_USER/SMTP_PASS). Có thể bấm "Gửi lại" ở tab Thanh toán.</li>
+        </ul>
       </div>
     </section>
 

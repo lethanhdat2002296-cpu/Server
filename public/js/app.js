@@ -107,6 +107,9 @@ async function exportToExcel(rows, sheetName, fileName, headers) {
 document.getElementById('topbar-username').textContent = cachedUser.full_name || cachedUser.username || '';
 document.getElementById('btn-logout').addEventListener('click', () => { localStorage.clear(); window.location.href = '/'; });
 
+// Điền link trang thanh toán thật vào hướng dẫn
+(() => { const el = document.getElementById('guide-pay-link'); if (el) el.textContent = location.origin + '/payment.html'; })();
+
 document.querySelectorAll('.nav-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     const target = tab.dataset.page;

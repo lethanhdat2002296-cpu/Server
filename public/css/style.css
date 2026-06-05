@@ -463,6 +463,27 @@ a { color: #0984e3; text-decoration: none; }
   .form-row { grid-template-columns: 1fr; }
 }
 
+/* ============ GUIDE (hướng dẫn) ============ */
+.callout {
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 12px;
+}
+.callout.info { background: #e3f2fd; color: #0d47a1; }
+.callout.warn { background: #fff3cd; color: #856404; }
+.callout.success { background: #d4edda; color: #155724; }
+#page-guide code, .guide code {
+  background: #f0f0f0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: #c0392b;
+  word-break: break-word;
+}
+#page-guide .card-title { font-size: 16px; }
+
 /* ============ PAYMENT 2-COLUMN GRID ============ */
 .pay-grid {
   display: grid;
