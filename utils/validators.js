@@ -1,5 +1,4 @@
 // Hàm validate dùng cho backend (và đồng bộ với frontend)
-const config = require('../config');
 
 function validatePhone(phone) {
   if (!phone) return 'Số điện thoại không được để trống';
@@ -9,12 +8,11 @@ function validatePhone(phone) {
 
 function validateEmail(email) {
   if (!email) return 'Email không được để trống';
-  // Local part: không cho bắt đầu/kết thúc bằng dấu chấm, không cho 2 chấm liên tiếp
-  const allowedDomains = ['gmail.com', `${config.COMPANY_DOMAIN}.com`];
-  const domainPattern = allowedDomains.join('|').replace(/\./g, '\\.');
-  const re = new RegExp(`^[a-zA-Z0-9_%+-]+(\\.[a-zA-Z0-9_%+-]+)*@(${domainPattern})$`);
-  if (!re.test(email)) {
-    return `Email phải kết thúc bằng @gmail.com hoặc @${config.COMPANY_DOMAIN}.com (không chứa dấu chấm liên tiếp)`;
+  // Định dạng email TỔNG QUÁT (mọi nhà cung cấp): local@domain.tld.
+  // Vẫn chặn dấu chấm liên tiếp / đầu / cuối ở phần local; domain phải có ít nhất 1 dấu chấm.
+  const re = /^[a-zA-Z0-9_%+-]+(\.[a-zA-Z0-9_%+-]+)*@([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+)$/;
+  if (email.length > 254 || !re.test(email)) {
+    return 'Email không hợp lệ (ví dụ: ten@gmail.com)';
   }
   return null;
 }

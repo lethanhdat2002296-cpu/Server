@@ -18,8 +18,9 @@
     <div class="auth-card" style="padding:22px;margin-bottom:18px;">
       <div class="form-group" style="position:relative;margin-bottom:0;">
         <label>Họ và tên *</label>
-        <input type="text" id="name-input" autocomplete="off" placeholder="Gõ tên để tìm..." required>
-        <div id="name-suggest" class="suggest-box"></div>
+        <input type="text" id="name-input" autocomplete="off" placeholder="Gõ tên để tìm..." required
+               role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="name-suggest">
+        <div id="name-suggest" class="suggest-box" role="listbox" aria-label="Gợi ý tên thành viên"></div>
         <div class="field-hint">Gõ tên rồi <b>bấm chọn đúng tên của bạn</b> trong gợi ý.</div>
         <div class="field-error"></div>
       </div>
@@ -44,13 +45,18 @@
           <div id="qr-box" style="text-align:center;margin:auto 0;">
             <div style="position:relative;display:inline-block;">
               <img id="qr-img" alt="Mã QR" style="max-width:260px;width:100%;border-radius:8px;display:block;">
-              <div id="qr-expired" style="position:absolute;inset:0;background:rgba(255,255,255,0.93);flex-direction:column;align-items:center;justify-content:center;border-radius:8px;display:none;">
-                <div style="color:#d63031;font-weight:700;margin-bottom:10px;">⏱ Mã QR đã hết hạn</div>
-                <button type="button" id="qr-refresh" class="btn-primary" style="width:auto;padding:8px 18px;">🔄 Làm mới</button>
+              <div id="qr-expired" style="position:absolute;inset:0;background:rgba(255,255,255,0.95);flex-direction:column;align-items:center;justify-content:center;border-radius:8px;display:none;">
+                <div style="color:#636e72;font-weight:700;margin-bottom:4px;">🔄 Làm mới để quét lại</div>
+                <div style="font-size:12px;color:#7f8c8d;margin-bottom:10px;max-width:220px;text-align:center;">Nếu bạn đã chuyển khoản, giao dịch vẫn hợp lệ.</div>
+                <button type="button" id="qr-refresh" class="btn-primary" style="width:auto;padding:8px 18px;">🔄 Làm mới mã</button>
               </div>
             </div>
             <div id="qr-timer" style="font-size:14px;font-weight:700;color:#e17055;margin-top:10px;"></div>
             <div id="qr-info" style="font-size:13px;color:#555;margin-top:8px;line-height:1.8;text-align:left;display:inline-block;background:#fafbfc;padding:10px 14px;border-radius:10px;"></div>
+            <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+              <button type="button" id="qr-copy-amount" class="btn-secondary" style="width:auto;padding:7px 14px;font-size:12px;">📋 Copy số tiền</button>
+              <button type="button" id="qr-copy-desc" class="btn-secondary" style="width:auto;padding:7px 14px;font-size:12px;">📋 Copy nội dung CK</button>
+            </div>
             <div style="margin-top:12px;">
               <button type="button" id="qr-download" class="btn-secondary" style="width:auto;padding:9px 20px;font-size:13px;">📥 Tải mã QR về máy</button>
               <div class="field-hint" style="margin-top:6px;">Lưu mã về điện thoại/máy tính để chuyển khoản sau.</div>

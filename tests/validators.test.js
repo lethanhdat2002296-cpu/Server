@@ -21,11 +21,17 @@ describe('validateEmail', () => {
   it('chấp nhận @gmail.com', () => {
     expect(validateEmail('abc@gmail.com')).toBeNull();
   });
-  it('chấp nhận @company.com (domain mặc định)', () => {
+  it('chấp nhận @company.com', () => {
     expect(validateEmail('abc@company.com')).toBeNull();
   });
-  it('từ chối @yahoo.com', () => {
-    expect(validateEmail('abc@yahoo.com')).toBeTruthy();
+  it('chấp nhận mọi nhà cung cấp (@yahoo.com, @outlook.com, @icloud.com)', () => {
+    expect(validateEmail('abc@yahoo.com')).toBeNull();
+    expect(validateEmail('abc@outlook.com')).toBeNull();
+    expect(validateEmail('a.b@icloud.com')).toBeNull();
+  });
+  it('từ chối thiếu tên miền hoặc không có dấu chấm', () => {
+    expect(validateEmail('abc@localhost')).toBeTruthy();
+    expect(validateEmail('abc')).toBeTruthy();
   });
   it('từ chối dấu chấm liên tiếp', () => {
     expect(validateEmail('a..b@gmail.com')).toBeTruthy();

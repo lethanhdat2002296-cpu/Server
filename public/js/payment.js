@@ -23,13 +23,40 @@ function fmtDate(s) { try { return new Date(s).toLocaleString('vi-VN', { timeZon
 // ============ VALIDATORS ============
 const V = {
   phone: v => /^0\d{9}$/.test(v) ? null : 'SĐT phải 10 số, bắt đầu bằng 0',
-  email: v => /^[a-zA-Z0-9_%+-]+(\.[a-zA-Z0-9_%+-]+)*@(gmail\.com|company\.com)$/.test(v) ? null : 'Email phải @gmail.com hoặc @company.com',
+  email: v => /^[a-zA-Z0-9_%+-]+(\.[a-zA-Z0-9_%+-]+)*@([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+)$/.test(v) && v.length <= 254 ? null : 'Email không hợp lệ (ví dụ: ten@gmail.com)',
   name: v => (v && v.trim().length >= 2) ? null : 'Vui lòng nhập họ tên'
 };
 
 // ============ AUTOCOMPLETE TÊN ============
 const suggestBox = document.getElementById('name-suggest');
 let suggestTimer = null;
+let activeSuggest = -1;
+
+function showSuggest(on) {
+  suggestBox.classList.toggle('show', on);
+  nameInput.setAttribute('aria-expanded', on ? 'true' : 'false');
+  if (!on) activeSuggest = -1;
+}
+function updateActiveSuggest(items) {
+  items.forEach((it, i) => {
+    const on = i === activeSuggest;
+    it.classList.toggle('active', on);
+    if (on) { it.setAttribute('aria-selected', 'true'); it.scrollIntoView({ block: 'nearest' }); }
+    else it.removeAttribute('aria-selected');
+  });
+}
+
+// Điều hướng gợi ý bằng bàn phím: ↑ ↓ chọn, Enter xác nhận, Esc đóng
+nameInput.addEventListener('keydown', e => {
+  if (!suggestBox.classList.contains('show')) return;
+  const items = suggestBox.querySelectorAll('.suggest-item');
+  if (!items.length) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); activeSuggest = (activeSuggest + 1) % items.length; updateActiveSuggest(items); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); activeSuggest = (activeSuggest - 1 + items.length) % items.length; updateActiveSuggest(items); }
+  else if (e.key === 'Enter') {
+    if (activeSuggest >= 0 && items[activeSuggest]) { e.preventDefault(); const it = items[activeSuggest]; selectMember(it.dataset.id, it.dataset.name); }
+  } else if (e.key === 'Escape') { showSuggest(false); }
+});
 
 nameInput.addEventListener('input', () => {
   // Gõ lại tên → reset xác minh + lịch sử
@@ -41,28 +68,28 @@ nameInput.addEventListener('input', () => {
   loadHistory();
   const q = nameInput.value.trim();
   clearTimeout(suggestTimer);
-  if (q.length < 1) { suggestBox.classList.remove('show'); return; }
+  if (q.length < 1) { showSuggest(false); return; }
   suggestTimer = setTimeout(async () => {
     try {
       const res = await fetch(`/api/public/members/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       const members = data.members || [];
-      if (!members.length) { suggestBox.classList.remove('show'); return; }
+      if (!members.length) { showSuggest(false); return; }
       suggestBox.innerHTML = members.map(m => {
         const hints = [m.phone_hint, m.email_hint].filter(Boolean).map(escapeText).join(' • ');
-        return `<div class="suggest-item" data-id="${m.id}" data-name="${escapeText(m.full_name)}">
+        return `<div class="suggest-item" role="option" data-id="${m.id}" data-name="${escapeText(m.full_name)}">
            <div class="si-name">${escapeText(m.full_name)}</div>
            ${hints ? `<div class="si-hint">${hints}</div>` : ''}
          </div>`;
       }).join('');
-      suggestBox.classList.add('show');
+      showSuggest(true);
       suggestBox.querySelectorAll('.suggest-item').forEach(it => it.addEventListener('click', () => selectMember(it.dataset.id, it.dataset.name)));
-    } catch (e) { suggestBox.classList.remove('show'); }
+    } catch (e) { showSuggest(false); }
   }, 250);
 });
 
 document.addEventListener('click', e => {
-  if (!suggestBox.contains(e.target) && e.target !== nameInput) suggestBox.classList.remove('show');
+  if (!suggestBox.contains(e.target) && e.target !== nameInput) showSuggest(false);
 });
 
 // Chọn tên từ gợi ý → YÊU CẦU xác minh 4 số cuối SĐT trước khi hiện thông tin
@@ -71,7 +98,7 @@ function selectMember(id, name) {
   selectedMemberId = null;
   verifiedLast4 = '';
   nameInput.value = name;
-  suggestBox.classList.remove('show');
+  showSuggest(false);
   fieldErr(nameInput, null);
   form.phone.value = ''; form.email.value = '';
   loadHistory(); // reset lịch sử (chưa xác minh)
@@ -335,7 +362,7 @@ function startQrCountdown() {
     left--;
     if (left <= 0) {
       clearInterval(qrTimer);
-      el.textContent = '⏱ Mã QR đã hết hạn';
+      el.textContent = '🔄 Bấm làm mới để quét lại';
       document.getElementById('qr-expired').style.display = 'flex';
       return;
     }
@@ -364,6 +391,27 @@ async function initQr() {
     document.getElementById('qr-img').src = buildVietQrUrl(qrConfig) + '&_=' + Date.now();
     startQrCountdown();
   });
+
+  // Nút copy số tiền / nội dung CK (giúp người dùng dán nhanh khi tự nhập chuyển khoản)
+  const copyTo = async (text, btn) => {
+    const old = btn.textContent;
+    let ok = false;
+    try { if (navigator.clipboard) { await navigator.clipboard.writeText(String(text)); ok = true; } } catch (e) { /* rơi xuống fallback */ }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = String(text); ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        ok = document.execCommand('copy'); ta.remove();
+      } catch (e) { /* ignore */ }
+    }
+    btn.textContent = ok ? '✓ Đã copy' : '⚠ Lỗi copy';
+    setTimeout(() => { btn.textContent = old; }, 1400);
+  };
+  const caBtn = document.getElementById('qr-copy-amount');
+  const cdBtn = document.getElementById('qr-copy-desc');
+  if (caBtn) caBtn.addEventListener('click', () => copyTo(qrConfig.amount, caBtn));
+  if (cdBtn) cdBtn.addEventListener('click', () => copyTo(qrConfig.description, cdBtn));
 }
 initQr();
 

@@ -9,8 +9,9 @@ window.Validators = {
   },
   email(v) {
     if (!v) return 'Email không được để trống';
-    const re = new RegExp(`^[a-zA-Z0-9._%+-]+@(gmail\\.com|${this.COMPANY_DOMAIN}\\.com)$`);
-    if (!re.test(v)) return `Email phải kết thúc bằng @gmail.com hoặc @${this.COMPANY_DOMAIN}.com`;
+    // Định dạng tổng quát (mọi nhà cung cấp) - đồng bộ với server
+    const re = /^[a-zA-Z0-9_%+-]+(\.[a-zA-Z0-9_%+-]+)*@([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+)$/;
+    if (v.length > 254 || !re.test(v)) return 'Email không hợp lệ (ví dụ: ten@gmail.com)';
     return null;
   },
   username(v) {
