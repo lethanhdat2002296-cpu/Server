@@ -5,6 +5,7 @@ const { query } = require('../lib/db');
 const config = require('../config');
 const { validatePassword } = require('../utils/validators');
 const { sendResetCode } = require('../utils/email');
+const { getClientIp, checkRateLimit } = require('../utils/ratelimit');
 
 const router = express.Router();
 
@@ -21,6 +22,12 @@ router.post('/login', async (req, res, next) => {
     const uname = username.toLowerCase().trim();
     const now = Date.now();
 
+    // Rate-limit theo IP (chống credential-stuffing + giảm DoS khóa account)
+    const ipRl = await checkRateLimit(`auth:login:${getClientIp(req)}`, 20, 15 * 60 * 1000);
+    if (!ipRl.allowed) {
+      return res.status(429).json({ error: `Quá nhiều lần thử từ thiết bị này. Vui lòng đợi ${Math.ceil(ipRl.retryAfterSec / 60)} phút.` });
+    }
+
     // Kiểm tra khoá
     const attemptRes = await query('SELECT * FROM login_attempts WHERE username = $1', [uname]);
     const attempt = attemptRes.rows[0];
@@ -36,15 +43,9 @@ router.post('/login', async (req, res, next) => {
     // Tìm user (loại trừ user đã bị soft-delete)
     const userRes = await query('SELECT * FROM users WHERE username = $1 AND deleted_at IS NULL', [uname]);
     const user = userRes.rows[0];
-    if (!user) {
-      return res.status(404).json({
-        error: 'Tài khoản admin không tồn tại',
-        not_found: true
-      });
-    }
 
-    // So mật khẩu
-    const ok = await bcrypt.compare(password, user.password_hash);
+    // So mật khẩu (chỉ khi user tồn tại). KHÔNG phân biệt "không tồn tại" vs "sai mật khẩu" → chống dò username
+    const ok = user ? await bcrypt.compare(password, user.password_hash) : false;
     if (!ok) {
       const current = attempt ? attempt.failed_count + 1 : 1;
       let locked_until = 0;
@@ -60,13 +61,13 @@ router.post('/login', async (req, res, next) => {
 
       if (locked_until) {
         return res.status(429).json({
-          error: `Bạn đã nhập sai ${config.MAX_LOGIN_ATTEMPTS} lần. Tài khoản bị khoá ${config.LOCKOUT_SECONDS} giây`,
+          error: `Sai quá ${config.MAX_LOGIN_ATTEMPTS} lần. Vui lòng thử lại sau ${config.LOCKOUT_SECONDS} giây`,
           locked: true,
           seconds_left: config.LOCKOUT_SECONDS
         });
       }
       return res.status(401).json({
-        error: `Sai mật khẩu. Bạn còn ${config.MAX_LOGIN_ATTEMPTS - current} lần thử`,
+        error: 'Sai tên đăng nhập hoặc mật khẩu',
         attempts_left: config.MAX_LOGIN_ATTEMPTS - current
       });
     }
@@ -75,7 +76,7 @@ router.post('/login', async (req, res, next) => {
     await query('DELETE FROM login_attempts WHERE username = $1', [uname]);
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, full_name: user.full_name, role: user.role || 'user' },
+      { id: user.id, username: user.username, full_name: user.full_name, role: user.role || 'user', tv: user.token_version || 0 },
       config.JWT_SECRET,
       { expiresIn: config.JWT_EXPIRES_IN }
     );
@@ -102,17 +103,21 @@ router.post('/forgot-password', async (req, res, next) => {
     if (!identifier || !identifier.trim()) {
       return res.status(400).json({ error: 'Vui lòng nhập tên đăng nhập, email hoặc số điện thoại' });
     }
+    // Rate-limit theo IP
+    const ipRl = await checkRateLimit(`auth:forgot:${getClientIp(req)}`, 5, 15 * 60 * 1000);
+    if (!ipRl.allowed) {
+      return res.status(429).json({ error: `Bạn yêu cầu quá nhiều lần. Vui lòng đợi ${Math.ceil(ipRl.retryAfterSec / 60)} phút.` });
+    }
     const id = identifier.toLowerCase().trim();
+    // Thông điệp TRUNG TÍNH — không tiết lộ tài khoản có tồn tại hay không
+    const neutral = { ok: true, message: 'Nếu tài khoản tồn tại, mã xác nhận đã được gửi tới email đăng ký.' };
 
-    // Tìm user theo username / email / phone
     const r = await query(
       `SELECT * FROM users WHERE (username = $1 OR email = $1 OR phone = $1) AND deleted_at IS NULL`,
       [id]
     );
     const user = r.rows[0];
-    if (!user) {
-      return res.status(404).json({ error: 'Không tìm thấy tài khoản với thông tin này' });
-    }
+    if (!user) return res.json(neutral);
 
     // Tạo mã 8 chữ số (tăng entropy từ 1M lên 100M)
     const code = String(Math.floor(10000000 + Math.random() * 90000000));
@@ -127,17 +132,10 @@ router.post('/forgot-password', async (req, res, next) => {
 
     try {
       const result = await sendResetCode(user.email, code, user.full_name);
-      // Mask email để user xác nhận đúng tài khoản
-      const masked = user.email.replace(/^(.{1,2}).*(@.*)$/, '$1***$2');
-      return res.json({
-        ok: true,
-        message: `Mã xác nhận đã được gửi đến ${masked}`,
-        masked_email: masked,
-        dev_mode: result.dev || false
-      });
+      return res.json({ ...neutral, dev_mode: result.dev || false });
     } catch (mailErr) {
       console.error('Lỗi gửi email forgot-password:', mailErr);
-      return res.status(500).json({ error: 'Không gửi được email. Vui lòng thử lại sau' });
+      return res.json(neutral); // vẫn trung tính, không lộ qua lỗi gửi mail
     }
   } catch (err) { next(err); }
 });
@@ -180,9 +178,9 @@ router.post('/reset-password', async (req, res, next) => {
       return res.status(400).json({ error: 'Mã xác nhận đã hết hạn. Vui lòng yêu cầu mã mới' });
     }
 
-    // Update password
+    // Update password + thu hồi mọi JWT cũ (token_version++)
     const hash = await bcrypt.hash(new_password, 10);
-    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
+    await query('UPDATE users SET password_hash = $1, token_version = COALESCE(token_version,0) + 1 WHERE id = $2', [hash, user.id]);
     await query('UPDATE reset_codes SET used = 1 WHERE id = $1', [row.id]);
 
     // Reset login_attempts (trong trường hợp user đang bị khóa)

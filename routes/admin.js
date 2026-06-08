@@ -1,7 +1,7 @@
 const express = require('express');
 const { query, pool } = require('../lib/db');
 const config = require('../config');
-const { adminRequired } = require('../middleware/auth');
+const { adminRequired, passwordConfirmRequired } = require('../middleware/auth');
 const { sendPaymentConfirmed, sendPaymentRejected } = require('../utils/email');
 const { nowInTimezone, addDays, daysBetween } = require('../utils/time');
 const { getQrConfig, saveQrConfig } = require('../utils/appconfig');
@@ -573,7 +573,7 @@ router.post('/archive', adminRequired, async (req, res, next) => {
 
 // KHÔI PHỤC từ file backup JSON (cho kịch bản DB đầy → DB mới trống)
 // body = nội dung file backup (định dạng /backup). Mặc định GHI ĐÈ toàn bộ.
-router.post('/restore', adminRequired, async (req, res, next) => {
+router.post('/restore', adminRequired, passwordConfirmRequired, async (req, res, next) => {
   const data = req.body || {};
   if ((data.version !== 1 && data.version !== 2) || !Array.isArray(data.members)) {
     return res.status(400).json({ error: 'File backup không hợp lệ (thiếu version/members).' });

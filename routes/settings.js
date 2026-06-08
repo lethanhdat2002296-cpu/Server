@@ -111,7 +111,7 @@ router.post('/password/change', authRequired, async (req, res, next) => {
     }
 
     const hash = await bcrypt.hash(new_password, 10);
-    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.id]);
+    await query('UPDATE users SET password_hash = $1, token_version = COALESCE(token_version,0) + 1 WHERE id = $2', [hash, req.user.id]);
     await query('UPDATE reset_codes SET used = 1 WHERE id = $1', [row.id]);
 
     res.json({ ok: true, message: 'Đổi mật khẩu thành công' });

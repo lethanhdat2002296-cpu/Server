@@ -17,7 +17,7 @@ if (isProduction) {
 module.exports = {
   PORT: parseInt(process.env.PORT || '3000', 10),
   JWT_SECRET: process.env.JWT_SECRET || DEFAULT_JWT_SECRET,
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '12h',
 
   // Khung giờ check-in (24h)
   CHECKIN_START_HOUR: parseInt(process.env.CHECKIN_START_HOUR || '5', 10),  // 5:00

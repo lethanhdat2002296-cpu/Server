@@ -11,8 +11,8 @@ if (cachedUser.role !== 'admin') {
 }
 
 // ============ HELPERS ============
-async function api(method, url, body) {
-  const opts = { method, headers };
+async function api(method, url, body, extraHeaders) {
+  const opts = { method, headers: extraHeaders ? { ...headers, ...extraHeaders } : headers };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
   let data = {};
@@ -256,7 +256,9 @@ function initMembersTab() {
   document.getElementById('mem-template').addEventListener('click', downloadTemplate);
   document.getElementById('mem-clear-all').addEventListener('click', async () => {
     if (!confirm('Xóa TOÀN BỘ thành viên? Không thể hoàn tác.')) return;
-    const r = await api('DELETE', '/api/members');
+    const pw = prompt('Nhập lại MẬT KHẨU ADMIN để xác nhận xóa toàn bộ thành viên:');
+    if (!pw) return;
+    const r = await api('DELETE', '/api/members', null, { 'x-admin-password': pw });
     if (r && r.ok) { showToast('success', 'Đã xóa', r.data.message); memPage = 0; loadMembers(); }
     else showToast('error', 'Lỗi', r?.data?.error || '');
   });
@@ -919,6 +921,8 @@ async function doRestore(file) {
   if (!confirm('KHÔI PHỤC từ file JSON?\n\nToàn bộ dữ liệu hiện tại trong DB sẽ bị GHI ĐÈ. Chỉ nên dùng trên DB mới/trống.\n\nTiếp tục?')) {
     document.getElementById('bk-restore-file').value = ''; return;
   }
+  const pw = prompt('Nhập lại MẬT KHẨU ADMIN để xác nhận KHÔI PHỤC (ghi đè toàn bộ):');
+  if (!pw) { document.getElementById('bk-restore-file').value = ''; return; }
   showMsg('bk-restore-msg', 'info', 'Đang đọc file...');
   let data;
   try {
@@ -928,7 +932,7 @@ async function doRestore(file) {
     document.getElementById('bk-restore-file').value = ''; return;
   }
   showMsg('bk-restore-msg', 'info', 'Đang khôi phục...');
-  const r = await api('POST', '/api/admin/restore', data);
+  const r = await api('POST', '/api/admin/restore', data, { 'x-admin-password': pw });
   if (r && r.ok) {
     showMsg('bk-restore-msg', 'success', '✓ ' + r.data.message);
     loadBackupStatus();

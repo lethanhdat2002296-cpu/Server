@@ -1,6 +1,6 @@
 const express = require('express');
 const { query } = require('../lib/db');
-const { adminRequired } = require('../middleware/auth');
+const { adminRequired, passwordConfirmRequired } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -111,6 +111,13 @@ router.put('/:id', adminRequired, async (req, res, next) => {
     const phone = normPhone(req.body.phone);
     const email = clean(req.body.email).toLowerCase();
     const address = clean(req.body.address);
+    // Chống trùng SĐT với thành viên khác
+    if (phone) {
+      const dup = await query('SELECT id FROM members WHERE phone = $1 AND id <> $2 LIMIT 1', [phone, id]);
+      if (dup.rows.length) {
+        return res.status(409).json({ error: 'Số điện thoại này đã thuộc về thành viên khác.', fields: { phone: 'SĐT đã tồn tại' } });
+      }
+    }
     const r = await query(
       'UPDATE members SET full_name=$1, phone=$2, email=$3, address=$4 WHERE id=$5 RETURNING id',
       [full_name, phone, email, address, id]
@@ -130,8 +137,8 @@ router.delete('/:id', adminRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ============== DELETE ALL (xóa toàn bộ để import lại) ==============
-router.delete('/', adminRequired, async (req, res, next) => {
+// ============== DELETE ALL (xóa toàn bộ để import lại) — cần nhập lại mật khẩu ==============
+router.delete('/', adminRequired, passwordConfirmRequired, async (req, res, next) => {
   try {
     const c = (await query('SELECT COUNT(*)::int AS c FROM members')).rows[0].c;
     await query('DELETE FROM members');
