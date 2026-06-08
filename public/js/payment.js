@@ -366,3 +366,20 @@ async function initQr() {
   });
 }
 initQr();
+
+// ============ TẢI MÃ QR VỀ MÁY (điện thoại / laptop / PC) ============
+// Gọi endpoint proxy của server (ép tải dạng đính kèm) → chạy mọi thiết bị, không vướng CORS
+document.getElementById('qr-download').addEventListener('click', () => {
+  const btn = document.getElementById('qr-download');
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Đang tải...';
+  try {
+    const a = document.createElement('a');
+    a.href = '/api/public/qr-download?_=' + Date.now();
+    a.download = 'ma-qr-5am-club.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (e) { /* bỏ qua */ }
+  setTimeout(() => { btn.disabled = false; btn.textContent = old; }, 1500);
+});

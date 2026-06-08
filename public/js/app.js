@@ -862,6 +862,14 @@ function initSettingsTab() {
     document.getElementById('qr-preview-img').src = buildVietQrUrl(cfg);
     document.getElementById('qr-preview').style.display = 'block';
   });
+  // Tải mã QR (theo cấu hình ĐÃ LƯU) — qua endpoint proxy của server, ép tải về máy/in
+  const qrDlAdmin = document.getElementById('qr-download-admin');
+  if (qrDlAdmin) qrDlAdmin.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = '/api/public/qr-download?_=' + Date.now();
+    a.download = 'ma-qr-5am-club.png';
+    document.body.appendChild(a); a.click(); a.remove();
+  });
 }
 
 // Sinh URL ảnh VietQR từ cấu hình

@@ -18,6 +18,22 @@ router.get('/payment-config', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ============== TẢI MÃ QR VỀ MÁY (proxy → ép tải, chạy mọi thiết bị) ==============
+router.get('/qr-download', async (req, res, next) => {
+  try {
+    const cfg = await getQrConfig();
+    const url = `https://img.vietqr.io/image/${encodeURIComponent(cfg.bank_id)}-${encodeURIComponent(cfg.account_no)}-${encodeURIComponent(cfg.template || 'print')}.png`
+      + `?amount=${encodeURIComponent(cfg.amount || 0)}&addInfo=${encodeURIComponent(cfg.description || '')}&accountName=${encodeURIComponent(cfg.account_name || '')}`;
+    const r = await fetch(url);
+    if (!r.ok) return res.status(502).json({ error: 'Không tải được mã QR từ VietQR' });
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.set('Content-Type', 'image/png');
+    res.set('Content-Disposition', 'attachment; filename="ma-qr-5am-club.png"');
+    res.set('Cache-Control', 'no-store');
+    res.send(buf);
+  } catch (err) { next(err); }
+});
+
 // Rate-limit nhẹ cho việc dò danh sách (search + detail): 120 req / 10 phút / IP
 async function lookupLimit(req, res, next) {
   const rl = await checkRateLimit(`pub:lookup:${getClientIp(req)}`, 120, 10 * 60 * 1000);
