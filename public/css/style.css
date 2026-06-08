@@ -489,15 +489,16 @@ a { color: #0984e3; text-decoration: none; }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
-  align-items: start;
+  align-items: stretch; /* QR (trái) + form (phải) cao BẰNG NHAU */
 }
 .pay-grid > .auth-card { margin-bottom: 0; }
-/* Cột trái gộp QR + lịch sử, xếp dọc có khoảng cách */
-.pay-col { display: flex; flex-direction: column; gap: 18px; }
-.pay-col .auth-card { margin-bottom: 0; }
 @media (max-width: 760px) {
   .pay-grid { grid-template-columns: 1fr; }
 }
+/* Lịch sử thanh toán trải ngang full-width: xếp lưới lấp đầy chiều ngang */
+#hist-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+#hist-list .hist-item { margin-bottom: 0; }
+#hist-list .empty-state { grid-column: 1 / -1; }
 
 /* Lịch sử thanh toán (public) */
 .hist-item {

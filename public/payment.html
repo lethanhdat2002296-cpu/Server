@@ -36,14 +36,12 @@
       </div>
     </div>
 
-    <!-- 2 cột: trái = QR + lịch sử, phải = gửi biên lai -->
+    <!-- Hàng trên: 2 thẻ BẰNG NHAU - trái = QR, phải = gửi biên lai -->
     <div class="pay-grid">
-      <!-- CỘT TRÁI: QR + LỊCH SỬ -->
-      <div class="pay-col">
-        <!-- Mã QR chuyển khoản -->
-        <div class="auth-card" style="padding:22px;">
+        <!-- CỘT TRÁI: Mã QR chuyển khoản -->
+        <div class="auth-card" style="padding:22px;display:flex;flex-direction:column;">
           <div class="card-title">📲 Quét mã để chuyển khoản</div>
-          <div id="qr-box" style="text-align:center;">
+          <div id="qr-box" style="text-align:center;margin:auto 0;">
             <div style="position:relative;display:inline-block;">
               <img id="qr-img" alt="Mã QR" style="max-width:260px;width:100%;border-radius:8px;display:block;">
               <div id="qr-expired" style="position:absolute;inset:0;background:rgba(255,255,255,0.93);flex-direction:column;align-items:center;justify-content:center;border-radius:8px;display:none;">
@@ -59,21 +57,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Lịch sử thanh toán -->
-        <div class="auth-card" style="padding:22px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <div class="card-title" style="margin-bottom:0;">📋 Lịch sử thanh toán</div>
-            <button type="button" class="btn-secondary" id="hist-refresh" style="width:auto;padding:6px 12px;font-size:12px;" disabled>🔄</button>
-          </div>
-          <div id="hist-list">
-            <div class="empty-state" style="padding:24px 10px;">
-              <div class="ico">🔎</div>
-              <div>Chọn tên của bạn ở trên để xem lịch sử thanh toán và trạng thái.</div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- CỘT PHẢI: GỬI BIÊN LAI -->
       <div class="auth-card" style="padding:22px;">
@@ -123,6 +106,20 @@
           <h2 style="color:#00b894;margin-bottom:8px;">Đã gửi thành công!</h2>
           <p id="pay-success-msg" style="color:#555;font-size:14px;line-height:1.6;"></p>
           <button class="btn-secondary" id="pay-again" style="margin-top:18px;max-width:220px;display:inline-block;width:auto;">Gửi biên lai khác</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lịch sử thanh toán: trải ngang full-width bên dưới cho cân bằng -->
+    <div class="auth-card" style="padding:22px;margin-top:18px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div class="card-title" style="margin-bottom:0;">📋 Lịch sử thanh toán</div>
+        <button type="button" class="btn-secondary" id="hist-refresh" style="width:auto;padding:6px 12px;font-size:12px;" disabled>🔄</button>
+      </div>
+      <div id="hist-list">
+        <div class="empty-state" style="padding:24px 10px;">
+          <div class="ico">🔎</div>
+          <div>Chọn tên của bạn ở trên để xem lịch sử thanh toán và trạng thái.</div>
         </div>
       </div>
     </div>
