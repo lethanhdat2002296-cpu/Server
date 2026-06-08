@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- EDIT ME: replace the [[...]] placeholders and the values flagged with "EDIT:" notes below, then deploy this folder. -->
+  <title>Lê Thành Đạt — Business Analyst → Product Owner</title>
+  <meta name="description" content="Portfolio of a Business Analyst transitioning to Product Owner — flagship case study: 5AM Check-in product.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===================== HERO ===================== -->
+  <header class="hero">
+    <div class="wrap">
+      <span class="eyebrow">🚀 Business Analyst transitioning to Product Owner</span>
+      <!-- EDIT: your full name -->
+      <h1>Lê Thành Đạt</h1>
+      <p class="role">Business Analyst <span class="arrow">→</span> Product Owner</p>
+      <p class="pitch">
+        I turn ambiguous problems into clear requirements — and increasingly, into shipped products.
+        I own the full path from discovery and prioritization to delivery, iteration and measurable outcomes.
+      </p>
+
+      <div class="contact-row">
+        <!-- EDIT: contact details -->
+        <a class="chip" href="mailto:lethanhdat2002296@gmail.com">✉️ lethanhdat2002296@gmail.com</a>
+        <span class="chip">📞 [[your phone]]</span>
+        <a class="chip" href="[[your-linkedin-url]]">in LinkedIn</a>
+        <span class="chip">📍 [[your city]], Vietnam</span>
+      </div>
+
+      <div class="cta-row no-print">
+        <button class="btn btn-primary" onclick="window.print()">⬇ Download PDF</button>
+        <!-- EDIT: live demo URL once deployed on Vercel -->
+        <a class="btn btn-ghost" href="https://[[your-app]].vercel.app/payment.html" target="_blank" rel="noopener">🔗 Live demo</a>
+        <a class="btn btn-ghost" href="https://github.com/lethanhdat2002296-cpu/Server" target="_blank" rel="noopener">⌥ GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== SUMMARY ===================== -->
+  <section id="summary">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">Profile</div>
+        <h2>From documenting requirements to owning outcomes</h2>
+      </div>
+      <p class="lead">
+        As a Business Analyst I'm strong at elicitation, process modeling and translating stakeholder needs into
+        precise, testable requirements. I'm deliberately growing into Product Ownership: framing the
+        <b>“why”</b> and the <b>success metric</b> before the <b>“what”</b>, prioritizing ruthlessly against value and
+        constraints, and staying accountable through delivery and iteration. My flagship project below — a fee-collecting
+        attendance product I scoped, prioritized and shipped end-to-end — is concrete evidence of that shift.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== COMPETENCIES ===================== -->
+  <section id="skills" style="background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line);">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">Core competencies</div>
+        <h2>What I bring across BA and PO</h2>
+      </div>
+      <div class="grid-2">
+        <div class="card skill-group">
+          <h3><span class="dot"></span> Business Analysis</h3>
+          <div class="tags">
+            <span class="tag">Requirements elicitation</span>
+            <span class="tag">BRD / FRD / SRS</span>
+            <span class="tag">User stories &amp; acceptance criteria</span>
+            <span class="tag">Process modeling (BPMN)</span>
+            <span class="tag">Gap analysis (As-Is / To-Be)</span>
+            <span class="tag">Stakeholder management</span>
+            <span class="tag">Use cases &amp; wireframes</span>
+            <span class="tag">UAT &amp; defect triage</span>
+          </div>
+        </div>
+        <div class="card skill-group po">
+          <h3><span class="dot"></span> Product Ownership <span style="font-size:12px;color:var(--muted);font-weight:600;">(growing)</span></h3>
+          <div class="tags">
+            <span class="tag">Product vision &amp; framing</span>
+            <span class="tag">Backlog ownership</span>
+            <span class="tag">Prioritization (MoSCoW / RICE)</span>
+            <span class="tag">Roadmapping</span>
+            <span class="tag">Success metrics &amp; KPIs</span>
+            <span class="tag">Discovery &amp; user research</span>
+            <span class="tag">Agile / Scrum</span>
+            <span class="tag">End-to-end delivery</span>
+          </div>
+        </div>
+      </div>
+      <div class="card tools" style="margin-top:16px;">
+        <!-- EDIT: keep only the tools you actually use -->
+        <h3 style="font-size:14px;margin:0 0 10px;color:var(--ink-soft);">Tools &amp; technical literacy</h3>
+        <div class="tags">
+          <span class="tag">Jira / Confluence</span>
+          <span class="tag">Figma</span>
+          <span class="tag">SQL · PostgreSQL</span>
+          <span class="tag">REST APIs</span>
+          <span class="tag">Excel</span>
+          <span class="tag">Draw.io / BPMN</span>
+          <span class="tag">Git / GitHub</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CASE STUDY ===================== -->
+  <section id="case">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">Flagship case study</div>
+        <h2>5AM Check-in — attendance &amp; recurring-fee product</h2>
+        <p>A self-initiated product I owned end-to-end: from problem framing and requirements to prioritization,
+           delivery and iterative hardening.</p>
+      </div>
+
+      <div class="case-meta">
+        <span class="pill">Role: Product Owner (end-to-end)</span>
+        <span class="pill">Type: Web app (admin + public)</span>
+        <span class="pill">Stack: Node/Express · PostgreSQL (Neon) · Vercel</span>
+        <span class="pill">Status: Shipped &amp; in use</span>
+      </div>
+
+      <div class="card">
+        <div class="block">
+          <h3>🎯 Problem</h3>
+          <p>A “wake-up at 5AM” accountability group tracks daily attendance and collects a <b>recurring membership
+             fee</b>. Everything was manual — attendance in chat, fees reconciled by hand in spreadsheets. It was
+             error-prone, time-consuming, and the group could never answer the key question: <b>“who hasn't paid this
+             period?”</b></p>
+        </div>
+        <div class="block">
+          <h3>👥 Users</h3>
+          <p><b>Admin</b> (group manager) runs check-ins and approves payments. <b>Members</b> have no accounts — they
+             only use a public page to submit receipts and check their own status. Designing for two very different
+             users with opposite needs (control vs. friction-free access) drove most product decisions.</p>
+        </div>
+
+        <div class="block">
+          <h3>🧠 Key product decisions <span style="font-size:13px;color:var(--muted);font-weight:600;">(decision → rationale / trade-off)</span></h3>
+          <div class="decisions">
+            <div class="decision"><b>Removed member logins; admin owns the roster.</b>
+              <div class="why">Members won't maintain accounts. Importing from Excel + admin-driven check-in removed the
+              biggest adoption barrier — at the cost of self-service, which members didn't need.</div></div>
+            <div class="decision"><b>Strict 5:00–5:59 window, no make-up check-in.</b>
+              <div class="why">The product's whole purpose is the habit. Integrity of the streak was prioritized over
+              convenience — a deliberate “opinionated product” choice.</div></div>
+            <div class="decision"><b>Public payment page with 4-digit phone verification.</b>
+              <div class="why">Balanced accessibility (no login) against privacy. Members prove identity with the last 4
+              digits of their phone before any personal data or history is shown; brute-force is rate-limited.</div></div>
+            <div class="decision"><b>Period-based fee model + “unpaid this period” report.</b>
+              <div class="why">The highest-value feature. Turned opaque, manual reconciliation into a one-screen answer:
+              who paid / pending / unpaid, with expected-vs-collected totals and one-click reminders.</div></div>
+            <div class="decision"><b>Backup → archive → restore data lifecycle.</b>
+              <div class="why">To live within a free-tier database, old records compress into aggregates while
+              <b>lifetime totals and streaks stay continuous</b> — a constraint-driven design that protects the metric users care about.</div></div>
+          </div>
+        </div>
+
+        <div class="block">
+          <h3>🛠 Solution &amp; scope</h3>
+          <div class="feat-grid">
+            <div class="feat"><span class="ic">✅</span><div><b>Attendance</b><span>Time-gated check-in, bulk actions, daily export</span></div></div>
+            <div class="feat"><span class="ic">🧾</span><div><b>Payments</b><span>Receipt upload + OCR, email, admin approval workflow</span></div></div>
+            <div class="feat"><span class="ic">💰</span><div><b>Fees &amp; dues</b><span>Per-period tracking, unpaid report, email reminders</span></div></div>
+            <div class="feat"><span class="ic">📊</span><div><b>Reporting</b><span>Daily/weekly/monthly, streaks, leaderboard, Excel</span></div></div>
+            <div class="feat"><span class="ic">📲</span><div><b>VietQR</b><span>Auto-generated bank QR with copy &amp; download</span></div></div>
+            <div class="feat"><span class="ic">💾</span><div><b>Data lifecycle</b><span>Backup, archive overlay, restore, scheduled cleanup</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- product UI (representative) -->
+      <div class="mockups" style="margin-top:18px;">
+        <div class="mock">
+          <div class="bar"><i></i><i></i><i></i><span class="t">Dues — 2026-06</span></div>
+          <div class="body">
+            <div class="mt">💰 Who hasn't paid?</div>
+            <div class="mrow"><span class="nm">An N.</span><span class="badge ok">Paid</span></div>
+            <div class="mrow"><span class="nm">Bình T.</span><span class="badge wait">Pending</span></div>
+            <div class="mrow"><span class="nm">Cường L.</span><span class="badge no">Unpaid</span></div>
+            <div class="mrow" style="background:#faf5ff;"><span class="nm">Collected</span><span style="font-weight:700;color:var(--brand)">12 / 18</span></div>
+          </div>
+          <div class="cap">Dues report — paid / pending / unpaid + reminders</div>
+        </div>
+        <div class="mock">
+          <div class="bar"><i></i><i></i><i></i><span class="t">payment.html (public)</span></div>
+          <div class="body" style="text-align:center;">
+            <div class="mt" style="text-align:left;">📲 Scan to transfer</div>
+            <div class="qr"></div>
+            <div style="font-size:11px;color:var(--muted);">500,000đ · “5AM Club”</div>
+            <div class="mrow" style="margin-top:8px;text-align:left;"><span class="nm">🔒 Verify last 4 digits</span></div>
+          </div>
+          <div class="cap">Self-service receipt submission + status</div>
+        </div>
+        <div class="mock">
+          <div class="bar"><i></i><i></i><i></i><span class="t">Check-in</span></div>
+          <div class="body">
+            <div class="mt">✅ 5:00–5:59 window</div>
+            <div class="mrow"><span class="nm">An N.</span><span class="badge ok">✓</span></div>
+            <div class="mrow"><span class="nm">Bình T.</span><span class="badge ok">✓</span></div>
+            <div class="mrow"><span class="nm">Cường L.</span><span class="badge no">—</span></div>
+            <div class="day"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;">🔥 6-day streak</div>
+          </div>
+          <div class="cap">Daily attendance + streaks</div>
+        </div>
+      </div>
+
+      <!-- process -->
+      <div class="card" style="margin-top:18px;">
+        <div class="block" style="margin-bottom:6px;"><h3>🔁 Process &amp; iterations</h3></div>
+        <div class="timeline">
+          <div class="tl-step"><div class="tl-num">1</div><div><b>Discovery</b><p>Framed the real pain (manual fee reconciliation) and the success metric (zero “who-paid?” ambiguity).</p></div></div>
+          <div class="tl-step"><div class="tl-num">2</div><div><b>MVP</b><p>Attendance + receipt submission + admin approval. Shipped the thinnest end-to-end slice first.</p></div></div>
+          <div class="tl-step"><div class="tl-num">3</div><div><b>Structured review rounds</b><p>Repeated “what's missing / what's risky?” passes; each finding triaged into P0 / P1 / P2 and delivered by priority.</p></div></div>
+          <div class="tl-step"><div class="tl-num">4</div><div><b>High-value bets</b><p>Period-based fee tracking + dues report + reminders — the features that moved the core metric.</p></div></div>
+          <div class="tl-step"><div class="tl-num">5</div><div><b>Hardening</b><p>Security, data-integrity, automated tests and operational tooling before scaling usage.</p></div></div>
+        </div>
+      </div>
+
+      <!-- outcomes -->
+      <div class="card" style="margin-top:18px;">
+        <div class="block" style="margin-bottom:10px;"><h3>📈 Outcomes</h3></div>
+        <div class="stats">
+          <div class="stat"><div class="num">1-screen</div><div class="lbl">answer to “who hasn't paid?” (was manual)</div></div>
+          <div class="stat"><div class="num">100%</div><div class="lbl">fee status auto-reconciled per period</div></div>
+          <div class="stat"><div class="num">58</div><div class="lbl">automated tests guarding core logic</div></div>
+          <div class="stat"><div class="num">1 / 12</div><div class="lbl">serverless functions (within platform limit)</div></div>
+        </div>
+        <p style="margin:14px 0 0;color:var(--muted);font-size:13.5px;">
+          Also delivered: hardened security (rate-limiting, password-gated destructive actions, PII masking),
+          automated daily maintenance, and a backup/archive lifecycle that keeps lifetime stats intact on free-tier infrastructure.
+        </p>
+      </div>
+
+      <!-- competency map -->
+      <div class="card" style="margin-top:18px;">
+        <div class="block" style="margin-bottom:8px;"><h3>🧩 BA → PO competencies demonstrated</h3></div>
+        <table class="map">
+          <thead><tr><th>Competency</th><th>In this project</th></tr></thead>
+          <tbody>
+            <tr><td>Discovery &amp; framing</td><td>Identified the real problem (fee reconciliation) and defined the success metric before building.</td></tr>
+            <tr><td>Requirements &amp; AC</td><td>Translated needs into precise, testable rules (e.g., strict check-in window, verification flow).</td></tr>
+            <tr><td>Prioritization</td><td>Triaged every review finding into P0/P1/P2 and sequenced delivery by value &amp; risk.</td></tr>
+            <tr><td>Stakeholder fit</td><td>Designed for two opposite users (admin control vs. member zero-friction access).</td></tr>
+            <tr><td>Metrics mindset</td><td>Tied features to outcomes (expected-vs-collected, unpaid count, streak continuity).</td></tr>
+            <tr><td>Risk &amp; edge cases</td><td>Handled data loss, privacy, brute-force, free-tier limits, timezone correctness.</td></tr>
+            <tr><td>Technical fluency</td><td>Comfortable with data models, APIs and constraints — speaks the engineering language.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== HOW I WORK ===================== -->
+  <section id="how" style="background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line);">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">How I work</div>
+        <h2>A repeatable path from problem to outcome</h2>
+      </div>
+      <div class="grid-3">
+        <div class="card"><b style="color:var(--brand-2);">1 · Discover</b><p style="color:var(--ink-soft);font-size:14px;margin:6px 0 0;">Clarify the problem, users and the metric that defines success.</p></div>
+        <div class="card"><b style="color:var(--brand-2);">2 · Define</b><p style="color:var(--ink-soft);font-size:14px;margin:6px 0 0;">Write clear requirements &amp; acceptance criteria; model the flow.</p></div>
+        <div class="card"><b style="color:var(--brand-2);">3 · Prioritize</b><p style="color:var(--ink-soft);font-size:14px;margin:6px 0 0;">Rank a backlog by value vs. effort &amp; risk (MoSCoW / P0–P2).</p></div>
+        <div class="card"><b style="color:var(--brand-2);">4 · Deliver</b><p style="color:var(--ink-soft);font-size:14px;margin:6px 0 0;">Ship the thinnest end-to-end slice, then iterate on feedback.</p></div>
+        <div class="card"><b style="color:var(--brand-2);">5 · Review &amp; harden</b><p style="color:var(--ink-soft);font-size:14px;margin:6px 0 0;">Adversarial “what's missing?” passes, tests, and measurement.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== GROWTH ===================== -->
+  <section id="growth">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">BA → PO</div>
+        <h2>Where I am, and where I'm heading</h2>
+        <p>I'm intentionally bridging analysis depth with product ownership breadth.</p>
+      </div>
+      <div class="card">
+        <div class="growth-cols">
+          <div>
+            <h4 style="color:var(--brand-2);">✅ Already demonstrated</h4>
+            <ul>
+              <li>Owning a product end-to-end (idea → shipped → iterated)</li>
+              <li>Framing problems and defining success metrics</li>
+              <li>Backlog prioritization under real constraints</li>
+              <li>Writing testable requirements &amp; acceptance criteria</li>
+              <li>Strong technical literacy (data, APIs, trade-offs)</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="color:var(--accent);">🎯 Actively developing</h4>
+            <ul>
+              <li>Quantitative product discovery &amp; experimentation (A/B)</li>
+              <li>Roadmap storytelling &amp; stakeholder alignment at scale</li>
+              <li>Outcome-based OKRs and product analytics</li>
+              <li>Pricing / monetization &amp; go-to-market thinking</li>
+              <li>Leading a cross-functional squad as PO</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer id="contact">
+    <div class="wrap">
+      <h3>Let's talk product</h3>
+      <p class="muted">Open to Associate / Product Owner roles where I can pair analysis rigor with end-to-end ownership.</p>
+      <div class="contact-row">
+        <a class="chip" href="mailto:lethanhdat2002296@gmail.com">✉️ lethanhdat2002296@gmail.com</a>
+        <a class="chip" href="[[your-linkedin-url]]">in LinkedIn</a>
+        <a class="chip" href="https://github.com/lethanhdat2002296-cpu/Server">⌥ GitHub</a>
+        <button class="chip no-print" style="cursor:pointer;" onclick="window.print()">⬇ Download PDF</button>
+      </div>
+      <div class="foot-bottom">
+        <span>© <span id="yr">2026</span> Lê Thành Đạt · Business Analyst → Product Owner</span>
+        <span>Built &amp; shipped by me — see the 5AM Check-in case study above.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('yr').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

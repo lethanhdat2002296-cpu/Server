@@ -1,0 +1,225 @@
+/* ============================================================
+   Portfolio — BA → PO  |  clean, professional, print-ready
+   ============================================================ */
+:root {
+  --ink: #1e293b;
+  --ink-soft: #475569;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --brand: #6d28d9;
+  --brand-2: #4c1d95;
+  --brand-soft: #ede9fe;
+  --accent: #0ea5e9;
+  --green: #16a34a;
+  --amber: #d97706;
+  --red: #dc2626;
+  --radius: 14px;
+  --shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+  --maxw: 980px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+
+/* ---------- Hero ---------- */
+.hero {
+  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 55%, #7c3aed 100%);
+  color: #fff;
+  padding: 56px 0 48px;
+}
+.hero .wrap { display: flex; flex-direction: column; gap: 14px; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 5px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; letter-spacing: .3px;
+}
+.hero h1 { font-size: 40px; line-height: 1.1; margin: 4px 0 0; font-weight: 800; }
+.hero .role { font-size: 20px; font-weight: 600; margin: 0; opacity: .96; }
+.hero .role .arrow { opacity: .8; margin: 0 8px; }
+.hero .pitch { font-size: 16px; max-width: 680px; opacity: .92; margin: 6px 0 2px; }
+.contact-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff; padding: 7px 13px; border-radius: 10px;
+  font-size: 13.5px; font-weight: 500;
+}
+.chip:hover { background: rgba(255, 255, 255, 0.22); text-decoration: none; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 18px; border-radius: 10px; font-weight: 700; font-size: 14px;
+  cursor: pointer; border: 1.5px solid transparent; transition: transform .08s ease;
+}
+.btn:hover { text-decoration: none; transform: translateY(-1px); }
+.btn-primary { background: #fff; color: var(--brand-2); }
+.btn-ghost { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.5); }
+
+/* ---------- Sections ---------- */
+section { padding: 44px 0; }
+.section-head { margin-bottom: 22px; }
+.section-head .kicker {
+  font-size: 12.5px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--brand);
+}
+.section-head h2 { font-size: 26px; margin: 6px 0 0; font-weight: 800; color: var(--ink); }
+.section-head p { margin: 8px 0 0; color: var(--muted); max-width: 720px; }
+.lead { font-size: 16.5px; color: var(--ink-soft); max-width: 760px; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px;
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+/* ---------- Competencies ---------- */
+.skill-group h3 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+.skill-group .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--brand); display: inline-block; }
+.skill-group.po .dot { background: var(--accent); }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag {
+  background: var(--brand-soft); color: var(--brand-2);
+  border: 1px solid #ddd6fe; padding: 5px 11px; border-radius: 999px;
+  font-size: 13px; font-weight: 600;
+}
+.skill-group.po .tag { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
+.tools .tag { background: #f1f5f9; color: #334155; border-color: #e2e8f0; }
+
+/* ---------- Case study ---------- */
+.case-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.case-meta .pill {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+  background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+}
+.block { margin-bottom: 20px; }
+.block h3 { font-size: 17px; margin: 0 0 8px; color: var(--brand-2); }
+.block p { margin: 0; color: var(--ink-soft); }
+
+.decisions { display: grid; gap: 12px; }
+.decision {
+  border-left: 3px solid var(--brand); background: #faf5ff;
+  border-radius: 0 10px 10px 0; padding: 12px 16px;
+}
+.decision b { color: var(--ink); }
+.decision .why { color: var(--muted); font-size: 14px; }
+
+.feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.feat { display: flex; gap: 10px; align-items: flex-start; }
+.feat .ic { font-size: 18px; line-height: 1.4; }
+.feat b { display: block; font-size: 14.5px; }
+.feat span { color: var(--muted); font-size: 13.5px; }
+
+/* timeline */
+.timeline { display: grid; gap: 0; }
+.tl-step { display: grid; grid-template-columns: 30px 1fr; gap: 12px; padding-bottom: 16px; position: relative; }
+.tl-step:not(:last-child)::before {
+  content: ''; position: absolute; left: 14px; top: 26px; bottom: 0; width: 2px; background: var(--line);
+}
+.tl-num {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--brand); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; z-index: 1;
+}
+.tl-step b { font-size: 14.5px; }
+.tl-step p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+
+/* outcomes stats */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stat { text-align: center; padding: 16px 10px; }
+.stat .num { font-size: 26px; font-weight: 800; color: var(--brand); }
+.stat .lbl { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+/* competency map table */
+.map { width: 100%; border-collapse: collapse; font-size: 13.8px; }
+.map th, .map td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.map th { color: var(--brand-2); font-size: 12.5px; text-transform: uppercase; letter-spacing: .5px; }
+.map td:first-child { font-weight: 600; white-space: nowrap; color: var(--ink); }
+
+/* ---------- UI mockups (CSS, represent the product) ---------- */
+.mockups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.mock {
+  border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff;
+  box-shadow: var(--shadow);
+}
+.mock .bar { background: #f1f5f9; padding: 8px 12px; display: flex; gap: 6px; align-items: center; border-bottom: 1px solid var(--line); }
+.mock .bar i { width: 9px; height: 9px; border-radius: 50%; background: #cbd5e1; display: inline-block; }
+.mock .bar .t { margin-left: 8px; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.mock .body { padding: 12px; }
+.mock .body .mt { font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+.mrow { display: flex; justify-content: space-between; align-items: center; padding: 7px 9px; border-radius: 8px; background: #f8fafc; margin-bottom: 6px; font-size: 12px; }
+.mrow .nm { color: var(--ink); font-weight: 600; }
+.badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.badge.ok { background: #dcfce7; color: #166534; }
+.badge.wait { background: #fef9c3; color: #854d0e; }
+.badge.no { background: #fee2e2; color: #991b1b; }
+.qr {
+  width: 84px; height: 84px; margin: 6px auto; border-radius: 8px;
+  background-image:
+    linear-gradient(45deg, #1e293b 25%, transparent 25%), linear-gradient(-45deg, #1e293b 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1e293b 75%), linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+  background-size: 14px 14px; background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+  border: 4px solid #1e293b;
+}
+.mock .cap { text-align: center; font-size: 11px; color: var(--muted); padding: 0 10px 12px; }
+.day { display: flex; gap: 5px; margin-top: 8px; }
+.day i { flex: 1; height: 26px; border-radius: 5px; background: #e2e8f0; }
+.day i.on { background: var(--brand); }
+
+/* ---------- growth ---------- */
+.growth-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.growth-cols h4 { margin: 0 0 10px; font-size: 14.5px; }
+.growth-cols ul { margin: 0; padding-left: 18px; color: var(--ink-soft); font-size: 14px; line-height: 1.9; }
+
+/* ---------- footer ---------- */
+footer { background: #0f172a; color: #cbd5e1; padding: 34px 0; margin-top: 10px; }
+footer h3 { color: #fff; margin: 0 0 6px; font-size: 18px; }
+footer .contact-row { margin-top: 14px; }
+footer .chip { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); }
+footer .muted { color: #94a3b8; font-size: 13px; }
+footer .foot-bottom { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.1); font-size: 12.5px; color: #94a3b8; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 760px) {
+  .hero h1 { font-size: 30px; }
+  .hero .role { font-size: 17px; }
+  .grid-2, .grid-3, .feat-grid, .mockups, .growth-cols { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  section { padding: 34px 0; }
+  .map th:nth-child(2), .map td:nth-child(2) { display: none; }
+}
+
+/* ---------- print → clean A4 PDF ---------- */
+@media print {
+  :root { --shadow: none; }
+  body { background: #fff; font-size: 11.5px; }
+  .no-print { display: none !important; }
+  .wrap { max-width: 100%; padding: 0 6mm; }
+  .hero { background: var(--brand-2) !important; padding: 18px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .hero h1 { font-size: 26px; }
+  section { padding: 14px 0; }
+  .card, .mock, .decision, footer, .hero, .tag, .badge {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .card, .mock, .decision, .tl-step, .stat { break-inside: avoid; page-break-inside: avoid; }
+  section { break-inside: avoid-page; }
+  footer { background: #0f172a !important; color: #cbd5e1 !important; }
+  a { color: var(--ink); }
+  @page { margin: 10mm; }
+}
