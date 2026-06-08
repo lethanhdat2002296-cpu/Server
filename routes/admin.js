@@ -350,7 +350,6 @@ router.get('/members/:id/detail', adminRequired, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id) || id < 1) return res.status(404).json({ error: 'Không tìm thấy thành viên' });
-    const t = nowInTimezone();
     const [memberRes, datesRes, paysRes, archive, stats] = await Promise.all([
       query('SELECT id, full_name, phone, email, address, created_at FROM members WHERE id = $1', [id]),
       query('SELECT check_date, check_time FROM member_checkins WHERE member_id = $1 ORDER BY check_date DESC LIMIT 60', [id]),

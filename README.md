@@ -1,203 +1,93 @@
 # 5AM Check-in
 
-Hệ thống check-in dậy sớm 5:00 AM hàng ngày. Stack: **Node.js + Express + Neon Postgres**, deploy lên **Vercel**.
+Hệ thống điểm danh dậy sớm 5:00 sáng + thu **phí thành viên định kỳ** cho nhóm.
+Stack: **Node.js + Express + Neon Postgres**, deploy trên **Vercel** (1 serverless function).
+
+> Mô hình: **không có tài khoản cho thành viên**. Admin import danh sách, tự điểm danh,
+> và duyệt biên lai thanh toán. Thành viên chỉ dùng **trang công khai** để nộp biên lai
+> và tra cứu trạng thái (xác minh bằng 4 số cuối SĐT).
+
+---
 
 ## Tính năng
 
-- Đăng ký / đăng nhập với validation đầy đủ
-- Khoá tài khoản 60s sau 5 lần sai mật khẩu
-- Check-in trong khung 5:00 - 6:00 sáng (nút đổi màu: đỏ → xanh → xám)
-- Lịch sử + thống kê tháng (đã check / quên / tổng)
-- Cập nhật profile + đổi mật khẩu qua mã email
-- Timezone Asia/Ho_Chi_Minh (Vercel mặc định UTC, đã handle)
+**Admin (đăng nhập):**
+- Đăng nhập JWT (12h) + khoá sau 5 lần sai, rate-limit theo IP, thu hồi token khi đổi mật khẩu.
+- Import thành viên từ Excel (dedup theo SĐT), sửa/xoá thành viên.
+- **Điểm danh** bằng tích chọn, nghiêm khung **5:00–5:59** (theo giờ VN); tích/bỏ hàng loạt theo bộ lọc; xuất Excel hôm nay.
+- **Duyệt thanh toán**: pending → confirmed/rejected, gửi email kết quả, ghi số tiền thực thu.
+- **Báo cáo**: tổng quan, nhanh/chi tiết (streak, tổng đã/chưa), tuần/tháng + biểu đồ, **bảng xếp hạng**, **xem chi tiết 1 thành viên**, xuất Excel.
+- **Công nợ theo kỳ** (`YYYY-MM`): ai đã đóng / chờ duyệt / chưa đóng + tổng dự kiến vs đã thu; **nhắc đóng phí** qua email.
+- **Sao lưu / Lưu trữ / Khôi phục**: backup JSON, archive cộng dồn (giữ tổng + nối streak), restore (cần nhập lại mật khẩu).
+- Cấu hình **QR VietQR** (ngân hàng/STK/số tiền/nội dung), tải mã QR để in.
+- Nhật ký thao tác (audit log).
+
+**Công khai (`/payment.html`, không đăng nhập):**
+- Gõ tên → gợi ý (che bớt SĐT/email) → **xác minh 4 số cuối SĐT** (khoá 5 lần sai/15 phút).
+- Hiện **mã QR** chuyển khoản + nút copy số tiền/nội dung + tải QR.
+- Nộp biên lai (OCR client bằng Tesseract) → gửi email "đã nhận"; xem **lịch sử & trạng thái** của mình.
 
 ---
 
-## 🚀 Deploy Vercel + GitHub + Neon (từng bước)
+## Cấu trúc
 
-### Bước 0 — ⚠ Reset Neon password trước
-
-Mày đã share connection string ra ngoài chat. Vào **Neon Console → Project → Settings → Reset Password** để tạo password mới. Lấy lại **connection string mới** (sẽ dùng ở Bước 2).
-
-### Bước 1 — Push code lên GitHub
-
-```bash
-cd C:\Users\letha\OneDrive\Desktop\5AM
-git init
-git add .
-git commit -m "Initial: 5AM check-in app"
 ```
-
-Tạo repo trống trên GitHub (không chọn README/gitignore), copy URL rồi:
-
-```bash
-git remote add origin https://github.com/<your-username>/5am-checkin.git
-git branch -M main
-git push -u origin main
+app.js                 # Express app (dùng chung local + Vercel) + security headers + /api/health
+server.js              # chạy local
+api/index.js           # entrypoint Vercel
+config.js              # đọc env (JWT, SMTP, timezone, khung giờ check-in)
+lib/db.js              # Neon pool + initSchema (mọi bảng + index)
+middleware/auth.js     # authRequired / adminRequired / passwordConfirmRequired (+ token_version)
+routes/
+  auth.js              # login, forgot/reset password
+  members.js           # import Excel, CRUD thành viên
+  checkin.js           # điểm danh (time-gate 5h) + bulk + xuất
+  admin.js             # duyệt thanh toán, báo cáo, công nợ, backup/archive/restore, QR config, nhắc phí
+  public.js            # gợi ý tên, xác minh, lịch sử, nộp biên lai, qr-download
+  settings.js          # admin profile + đổi mật khẩu
+  cron.js              # /api/cron/prune + /retry-email (bảo vệ bằng CRON_SECRET)
+utils/                 # time, validators, ratelimit, mask, stats, receipt, email, appconfig
+public/                # index.html (login), dashboard.html, payment.html, backup-viewer.html, css, js
+tests/                 # Vitest: validators, time, stats, mask, receipt
 ```
-
-✅ File `.env` đã có trong `.gitignore` nên password DB sẽ không bị push lên.
-
-### Bước 2 — Init schema lên Neon (chạy 1 lần)
-
-Sửa file `.env` local, dán connection string MỚI (sau khi reset password):
-
-```env
-DATABASE_URL=postgresql://neondb_owner:NEW_PASSWORD@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-JWT_SECRET=<random-32-ky-tu>
-```
-
-Tạo `JWT_SECRET` bằng cách (chạy trong PowerShell):
-```powershell
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-Chạy init schema:
-```bash
-npm install
-npm run init-db
-```
-
-Output:
-```
-✓ Tạo schema thành công!
-  - users
-  - check_ins
-  - login_attempts
-  - reset_codes
-```
-
-### Bước 3 — Deploy Vercel
-
-1. Vào https://vercel.com/new
-2. **Import** repo GitHub vừa push
-3. Khi setup, vào tab **Environment Variables**, paste các biến sau:
-
-| Tên | Giá trị |
-|-----|---------|
-| `DATABASE_URL` | Connection string Neon (đã reset) |
-| `JWT_SECRET` | Chuỗi random 32 ký tự (như Bước 2) |
-| `TIMEZONE` | `Asia/Ho_Chi_Minh` |
-| `COMPANY_DOMAIN` | `company` (hoặc tên domain công ty mày) |
-| `JWT_EXPIRES_IN` | `7d` (tuỳ chọn) |
-| `CHECKIN_START_HOUR` | `5` (tuỳ chọn) |
-| `CHECKIN_END_HOUR` | `6` (tuỳ chọn) |
-| `MAX_LOGIN_ATTEMPTS` | `5` (tuỳ chọn) |
-| `LOCKOUT_SECONDS` | `60` (tuỳ chọn) |
-
-> Cấu hình SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, …) thêm sau nếu muốn gửi email reset password thật. Để trống thì mã sẽ log ra Vercel Function Logs (chỉ DEV).
-
-4. Bấm **Deploy**. Đợi 1-2 phút.
-5. Vercel cấp URL dạng `https://5am-checkin-xxx.vercel.app`. Mở thử.
-
-### Bước 4 — Tích hợp Neon ↔ Vercel (tuỳ chọn, nhưng nên làm)
-
-Vercel có integration sẵn với Neon. Vào **Vercel Project → Storage → Connect Database → Neon** để auto-sync env. Lúc đó không cần tự dán `DATABASE_URL` nữa.
-
-### Bước 5 — Push update tự động deploy
-
-Từ giờ mỗi `git push origin main` sẽ tự build & deploy. Vercel có preview deploy cho từng PR.
 
 ---
 
-## 🖥 Chạy local
+## Chạy local
 
 ```bash
 npm install
-# Sửa .env với DATABASE_URL của Neon (đã reset password)
-npm run init-db    # chỉ chạy 1 lần
-npm start
+cp .env.example .env        # điền DATABASE_URL, JWT_SECRET, SMTP_*
+npm run init-db             # tạo/migrate schema trên Neon
+npm run create-admin        # tạo tài khoản admin đầu tiên
+npm run dev                 # http://localhost:3000
+npm test                    # chạy unit test
+npm run lint                # ESLint
 ```
 
-Mở http://localhost:3000
+## Biến môi trường (`.env`)
+
+| Biến | Bắt buộc | Ghi chú |
+|------|----------|---------|
+| `DATABASE_URL` | ✅ | Neon connection string (bắt buộc ở production) |
+| `JWT_SECRET` | ✅ (prod) | chuỗi random 32+ ký tự |
+| `JWT_EXPIRES_IN` | | mặc định `12h` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | (gửi email) | dùng domain có SPF/DKIM để tránh vào spam |
+| `CRON_SECRET` | (cron) | bắt buộc để bật `/api/cron/*` |
+| `ALLOWED_ORIGINS` | | danh sách origin (phẩy) để siết CORS |
+| `CHECKIN_START_HOUR` / `CHECKIN_END_HOUR` | | mặc định 5 / 6 |
+| `TIMEZONE` | | mặc định `Asia/Ho_Chi_Minh` |
 
 ---
 
-## 📁 Cấu trúc
+## Deploy Vercel
 
-```
-5AM/
-├── api/index.js          # Vercel serverless entry
-├── app.js                # Express app (dùng chung local + Vercel)
-├── server.js             # Local dev only
-├── config.js             # Đọc env vars
-├── vercel.json           # Cấu hình routing Vercel
-├── lib/db.js             # Neon Postgres pool + schema
-├── routes/
-│   ├── auth.js           # Đăng ký / đăng nhập
-│   ├── checkin.js        # Check-in + lịch sử + stats
-│   └── settings.js       # Profile + đổi password
-├── middleware/auth.js    # JWT verify
-├── utils/
-│   ├── validators.js
-│   └── email.js
-├── scripts/init-db.js    # Tạo schema 1 lần
-├── public/               # Frontend (auto serve trên Vercel)
-│   ├── index.html        # Login / Register
-│   ├── dashboard.html
-│   ├── css/style.css
-│   └── js/{auth,app}.js
-├── .env.example          # Template (commit lên Git)
-├── .env                  # Local thật (KHÔNG commit)
-└── .gitignore
-```
+- `vercel.json`: rewrite `/api/(.*)` → 1 function, security headers cho static, 2 cron daily (`prune`, `retry-email`).
+- Đặt các biến môi trường trong **Vercel → Settings → Environment Variables** (đặc biệt `JWT_SECRET`, `DATABASE_URL`, `CRON_SECRET`).
+- Vercel Cron gửi `Authorization: Bearer <CRON_SECRET>`. Hobby giới hạn cron 1 lần/ngày — cần dày hơn thì dùng GitHub Actions gọi `/api/cron/...?secret=...`.
 
----
+## Bảo trì
 
-## 🛢 Schema Postgres
-
-Đã được tạo tự động bởi `npm run init-db` (hoặc lazy trên cold start đầu tiên):
-
-```sql
--- users
-id SERIAL PRIMARY KEY,
-full_name, phone (UNIQUE), email (UNIQUE), username (UNIQUE), password_hash,
-created_at TIMESTAMPTZ
-
--- check_ins
-id SERIAL, user_id FK, check_date TEXT (YYYY-MM-DD), check_time TEXT,
-UNIQUE(user_id, check_date)
-
--- login_attempts
-username TEXT PK, failed_count INT, locked_until BIGINT (ms)
-
--- reset_codes
-id SERIAL, user_id FK, code TEXT, expires_at BIGINT, used INT
-```
-
----
-
-## 🔌 API Endpoints
-
-| Method | Endpoint | Auth | Mô tả |
-|--------|----------|------|-------|
-| POST | `/api/auth/register` | – | Đăng ký |
-| POST | `/api/auth/login` | – | Đăng nhập |
-| GET | `/api/checkin/status` | JWT | Trạng thái check-in hôm nay |
-| POST | `/api/checkin/check-in` | JWT | Check-in |
-| GET | `/api/checkin/history` | JWT | Lịch sử check-in |
-| GET | `/api/checkin/stats` | JWT | Thống kê tháng |
-| GET | `/api/settings/me` | JWT | Profile hiện tại |
-| PUT | `/api/settings/profile` | JWT | Cập nhật họ tên + email |
-| POST | `/api/settings/password/request-code` | JWT | Gửi mã đổi mật khẩu |
-| POST | `/api/settings/password/change` | JWT | Đổi mật khẩu |
-| GET | `/api/health` | – | Health check |
-
----
-
-## 🐛 Troubleshooting
-
-**Vercel deploy fail "Cannot find module"**
-→ Push lại, đảm bảo `package.json` có dep đầy đủ. Không commit `node_modules/`.
-
-**`has_db: false` ở `/api/health`**
-→ Chưa set `DATABASE_URL` trên Vercel Env. Settings → Environment Variables.
-
-**500 error khi gọi API**
-→ Mở **Vercel Dashboard → Project → Logs**, xem stack trace.
-
-**Check-in lúc 5h sáng VN nhưng vẫn báo disabled**
-→ Kiểm tra biến `TIMEZONE=Asia/Ho_Chi_Minh` đã set chưa.
-
-**Email reset không gửi được**
-→ Bình thường nếu chưa set SMTP. Mã được log ra Vercel Function Logs (Dashboard → Logs).
+- `/api/cron/prune` dọn bảng phụ phình to; `/api/cron/retry-email` gửi lại email kết quả bị lỗi.
+- Khi DB gần đầy: **Sao lưu** (tải JSON) → **Lưu trữ** (gộp + dọn điểm danh cũ) → tiếp tục; tổng vẫn hiển thị đầy đủ.
+- `/api/health` trả trạng thái DB thật (gắn uptime monitor).

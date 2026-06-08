@@ -11,9 +11,11 @@ const { initSchema, pool } = require('../lib/db');
   console.log('Đang tạo schema + index...');
   try {
     await initSchema();
-    console.log('✓ Tạo thành công!');
-    console.log('  Bảng: users, check_ins, login_attempts, reset_codes');
-    console.log('  Index: idx_checkins_user_id, idx_checkins_user_date_desc, idx_resetcodes_user_used');
+    console.log('✓ Tạo schema thành công!');
+    console.log('  Bảng: users(admin), members, member_checkins, payments, archive_data,');
+    console.log('        app_config, audit_log, rate_limits, login_attempts, reset_codes');
+    console.log('  Đã thêm: cột period/amount_received/detected_amount + token_version,');
+    console.log('           unique SĐT, FK payments.member_id, các index báo cáo.');
   } catch (err) {
     console.error('✗ Lỗi:', err.message);
     process.exit(1);
