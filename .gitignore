@@ -10,6 +10,3 @@ node_modules/
 .vercel
 .vscode
 .claude/
-
-# Portfolio dev-only preview server (not needed for deploy)
-portfolio/_serve.js
