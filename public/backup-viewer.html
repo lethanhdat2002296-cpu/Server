@@ -80,14 +80,15 @@
 
       const archive = data.archive || {};
       const archivedTotal = archive.total || 0;
-      const byPhone = archive.by_phone || {};
+      const byMember = archive.by_member || {};   // khóa member_id (mới)
+      const byPhone = archive.by_phone || {};     // khóa phone (cũ - fallback)
 
-      // Bảng tổng điểm danh mỗi thành viên = live + archive (theo SĐT)
-      const liveByPhone = {};
-      (data.member_checkins||[]).forEach(mc=>{ const p=mc.member_phone||''; liveByPhone[p]=(liveByPhone[p]||0)+1; });
+      // Bảng tổng điểm danh mỗi thành viên = live + archive (ưu tiên member_id, fallback SĐT)
+      const liveById = {};
+      (data.member_checkins||[]).forEach(mc=>{ if(mc.member_id!=null) liveById[mc.member_id]=(liveById[mc.member_id]||0)+1; });
       const memberRows = (data.members||[]).map(m=>{
-        const live = liveByPhone[m.phone]||0;
-        const ae = byPhone[m.phone];
+        const live = liveById[m.id]||0;
+        const ae = byMember[m.id] || (m.phone ? byPhone[m.phone] : null);
         const arch = typeof ae==='number' ? ae : (ae && ae.count) || 0;
         return {...m, live_checkins: live, archived_checkins: arch, total_checkins: live+arch};
       });

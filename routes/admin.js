@@ -5,6 +5,7 @@ const { adminRequired } = require('../middleware/auth');
 const { sendPaymentConfirmed, sendPaymentRejected } = require('../utils/email');
 const { nowInTimezone, addDays, daysBetween } = require('../utils/time');
 const { getQrConfig, saveQrConfig } = require('../utils/appconfig');
+const { foldDatesIntoEntry, computeMemberStreak } = require('../utils/stats');
 
 const router = express.Router();
 
@@ -26,27 +27,43 @@ function validateDateParam(input, fallback) {
   return input;
 }
 
+// Chuẩn hóa map archive: { key: { count, last_date, tail_streak } } (chấp nhận cả dạng số cũ)
+function normArchiveMap(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    out[k] = typeof v === 'number'
+      ? { count: v, last_date: null, tail_streak: 0 }
+      : { count: v.count || 0, last_date: v.last_date || null, tail_streak: v.tail_streak || 0 };
+  }
+  return out;
+}
+
 // Đọc dữ liệu lưu trữ cộng dồn (archive). Trả object an toàn kể cả khi rỗng.
-// by_phone chuẩn hóa: { phone: { count, last_date, tail_streak } }
+// by_member (mới): { '<member_id>': {count,last_date,tail_streak} }
+// by_phone (cũ, fallback cho backup trước khi đổi sang member_id)
 async function loadArchive() {
   try {
     const r = await query('SELECT payload FROM archive_data WHERE id = 1');
     const p = (r.rows[0] && r.rows[0].payload) || {};
-    const by_phone = {};
-    for (const [phone, v] of Object.entries(p.by_phone || {})) {
-      if (typeof v === 'number') by_phone[phone] = { count: v, last_date: null, tail_streak: 0 };
-      else by_phone[phone] = { count: v.count || 0, last_date: v.last_date || null, tail_streak: v.tail_streak || 0 };
-    }
     return {
       total: p.total || 0,
-      by_phone,
+      by_member: normArchiveMap(p.by_member),
+      by_phone: normArchiveMap(p.by_phone),
       by_date: p.by_date || {},     // { 'YYYY-MM-DD': count } - cho biểu đồ
       updated_at: p.updated_at || null,
       cutoff: p.cutoff || null
     };
   } catch (e) {
-    return { total: 0, by_phone: {}, by_date: {}, updated_at: null, cutoff: null };
+    return { total: 0, by_member: {}, by_phone: {}, by_date: {}, updated_at: null, cutoff: null };
   }
+}
+
+// Lấy bản ghi archive của 1 member: ưu tiên member_id (mới), fallback phone (backup cũ).
+// Migration ở POST /archive đảm bảo 1 member không nằm đồng thời ở cả 2 map (không cộng đôi).
+function archiveEntry(archive, member) {
+  return archive.by_member[member.id]
+    || (member.phone && archive.by_phone[member.phone])
+    || { count: 0, last_date: null, tail_streak: 0 };
 }
 
 // ============================================================
@@ -274,20 +291,11 @@ async function computeMemberStats(date) {
     const set = new Set(dates);
     const checkedToday = set.has(date);
 
-    // Dữ liệu đã lưu trữ của người này (theo SĐT): { count, last_date, tail_streak }
-    const arch = (m.phone && archive.by_phone[m.phone]) || { count: 0, last_date: null, tail_streak: 0 };
+    // Dữ liệu đã lưu trữ của người này (theo member_id, fallback phone): { count, last_date, tail_streak }
+    const arch = archiveEntry(archive, m);
 
-    // isChecked: 1 ngày đã điểm danh nếu có trong live HOẶC nằm trong "đuôi liên tiếp" đã lưu trữ
-    // → streak nối liền xuyên qua mốc backup. Đuôi archive = [last_date - (tail_streak-1) .. last_date]
-    const archTailStart = arch.last_date ? addDays(arch.last_date, -(arch.tail_streak - 1)) : null;
-    const isChecked = (d) => set.has(d) || (arch.last_date && archTailStart && d <= arch.last_date && d >= archTailStart);
-
-    let cursor;
-    if (isChecked(date)) cursor = date;
-    else if (!windowEnded) cursor = addDays(date, -1);
-    else cursor = null;
-    let streak = 0;
-    while (cursor && isChecked(cursor)) { streak++; cursor = addDays(cursor, -1); }
+    // Streak nối liền xuyên mốc backup (đuôi liên tiếp đã lưu) — xem utils/stats.js
+    const streak = computeMemberStreak(set, arch, date, windowEnded);
 
     const totalChecked = dates.length + (arch.count || 0);
 
@@ -346,7 +354,7 @@ router.get('/members/:id/detail', adminRequired, async (req, res, next) => {
     const member = memberRes.rows[0];
     if (!member) return res.status(404).json({ error: 'Không tìm thấy thành viên' });
     const stat = stats.find(s => s.id === id) || { streak: 0, total_checked: 0, total_missed: 0 };
-    const arch = (member.phone && archive.by_phone[member.phone]) || { count: 0 };
+    const arch = archiveEntry(archive, member);
     res.json({
       member,
       recent_dates: datesRes.rows,           // ngày điểm danh live gần đây (60)
@@ -442,7 +450,7 @@ router.get('/backup', adminRequired, async (req, res, next) => {
       query('SELECT payload FROM archive_data WHERE id = 1')
     ]);
     res.json({
-      version: 1,
+      version: 2,
       exported_at: new Date().toISOString(),
       counts: {
         members: members.rows.length,
@@ -465,7 +473,7 @@ router.get('/archive', adminRequired, async (req, res, next) => {
     const liveRes = await query('SELECT COUNT(*)::int AS c FROM member_checkins');
     res.json({
       archived_total: archive.total,
-      archived_members: Object.keys(archive.by_phone).length,
+      archived_members: Object.keys(archive.by_member).length + Object.keys(archive.by_phone).length,
       archived_dates: Object.keys(archive.by_date).length,
       updated_at: archive.updated_at,
       cutoff: archive.cutoff,
@@ -485,15 +493,14 @@ router.post('/archive', adminRequired, async (req, res, next) => {
     // TRANSACTION: đọc-gộp-ghi-xóa nguyên tử (chống bấm 2 lần cộng dồn trùng)
     await client.query('BEGIN');
 
-    const [rowsRes, byDateRes, totalRes, oldRes] = await Promise.all([
-      client.query(`SELECT m.phone, mc.check_date
-             FROM member_checkins mc JOIN members m ON m.id = mc.member_id
-             WHERE mc.check_date < $1 AND m.phone <> ''
-             ORDER BY m.phone, mc.check_date`, [cutoff]),
+    const [rowsRes, byDateRes, totalRes, oldRes, memPhoneRes] = await Promise.all([
+      client.query(`SELECT member_id, check_date FROM member_checkins
+             WHERE check_date < $1 ORDER BY member_id, check_date`, [cutoff]),
       client.query(`SELECT check_date, COUNT(*)::int AS c FROM member_checkins
              WHERE check_date < $1 GROUP BY check_date`, [cutoff]),
       client.query('SELECT COUNT(*)::int AS c FROM member_checkins WHERE check_date < $1', [cutoff]),
-      client.query('SELECT payload FROM archive_data WHERE id = 1')
+      client.query('SELECT payload FROM archive_data WHERE id = 1'),
+      client.query(`SELECT id, phone FROM members WHERE phone IS NOT NULL AND phone <> ''`)
     ]);
     const toArchive = totalRes.rows[0].c;
     if (toArchive === 0) {
@@ -503,38 +510,41 @@ router.post('/archive', adminRequired, async (req, res, next) => {
 
     // Chuẩn hóa archive cũ (trong transaction)
     const pOld = (oldRes.rows[0] && oldRes.rows[0].payload) || {};
-    const old = { total: pOld.total || 0, by_phone: {}, by_date: pOld.by_date || {} };
-    for (const [ph, v] of Object.entries(pOld.by_phone || {})) {
-      old.by_phone[ph] = typeof v === 'number' ? { count: v, last_date: null, tail_streak: 0 }
-        : { count: v.count || 0, last_date: v.last_date || null, tail_streak: v.tail_streak || 0 };
+    const by_member = normArchiveMap(pOld.by_member);
+    const legacyPhone = normArchiveMap(pOld.by_phone);
+    const by_date = { ...(pOld.by_date || {}) };
+    const oldTotal = pOld.total || 0;
+
+    // MIGRATE: chuyển entry by_phone cũ → by_member theo members hiện tại.
+    // Entry không map được (member đã xóa) GIỮ LẠI trong by_phone để không mất TỔNG.
+    const phoneToId = {};
+    for (const row of memPhoneRes.rows) phoneToId[row.phone] = row.id;
+    const by_phone = {};
+    for (const [ph, e] of Object.entries(legacyPhone)) {
+      const id = phoneToId[ph];
+      if (!id) { by_phone[ph] = e; continue; }
+      const cur = by_member[id];
+      if (!cur) by_member[id] = e;
+      else {
+        const newer = (e.last_date || '') > (cur.last_date || '') ? e : cur;
+        by_member[id] = { count: cur.count + e.count, last_date: newer.last_date, tail_streak: newer.tail_streak };
+      }
     }
 
-    // Gom ngày theo SĐT
-    const newByPhone = {};
+    // Gom ngày MỚI theo member_id — TẤT CẢ member (kể cả chưa có SĐT) → không còn mất dữ liệu
+    const newByMember = {};
     for (const row of rowsRes.rows) {
-      (newByPhone[row.phone] = newByPhone[row.phone] || []).push(row.check_date);
+      (newByMember[row.member_id] = newByMember[row.member_id] || []).push(row.check_date);
+    }
+    for (const [mid, rawDates] of Object.entries(newByMember)) {
+      by_member[mid] = foldDatesIntoEntry(by_member[mid], rawDates);  // xem utils/stats.js
     }
 
-    const by_phone = { ...old.by_phone };
-    for (const [phone, rawDates] of Object.entries(newByPhone)) {
-      const dates = [...new Set(rawDates)].sort();
-      const newCount = dates.length;
-      const newMax = dates[dates.length - 1];
-      let run = 1, i = dates.length - 1;
-      while (i > 0 && dates[i - 1] === addDays(dates[i], -1)) { run++; i--; }
-      const newTailStart = dates[i];
-      const oldE = by_phone[phone] || { count: 0, last_date: null, tail_streak: 0 };
-      let tail = run;
-      if (oldE.last_date && newTailStart === addDays(oldE.last_date, 1)) tail = run + oldE.tail_streak;
-      by_phone[phone] = { count: oldE.count + newCount, last_date: newMax, tail_streak: tail };
-    }
-
-    const by_date = { ...old.by_date };
     for (const row of byDateRes.rows) by_date[row.check_date] = (by_date[row.check_date] || 0) + row.c;
 
     const payload = {
-      total: old.total + toArchive,
-      by_phone, by_date,
+      total: oldTotal + toArchive,
+      by_member, by_phone, by_date,
       cutoff,
       updated_at: new Date().toISOString()
     };
@@ -565,7 +575,7 @@ router.post('/archive', adminRequired, async (req, res, next) => {
 // body = nội dung file backup (định dạng /backup). Mặc định GHI ĐÈ toàn bộ.
 router.post('/restore', adminRequired, async (req, res, next) => {
   const data = req.body || {};
-  if (data.version !== 1 || !Array.isArray(data.members)) {
+  if ((data.version !== 1 && data.version !== 2) || !Array.isArray(data.members)) {
     return res.status(400).json({ error: 'File backup không hợp lệ (thiếu version/members).' });
   }
   const client = await pool.connect();
@@ -577,8 +587,9 @@ router.post('/restore', adminRequired, async (req, res, next) => {
     await client.query('DELETE FROM members');
     await client.query('DELETE FROM archive_data');
 
-    // Nạp members → map phone → id mới
+    // Nạp members → map phone → id mới VÀ id cũ → id mới (re-link bền vững)
     const phoneToId = {};
+    const oldIdToNewId = {};
     let memberCount = 0;
     for (const m of data.members) {
       if (!m || !m.full_name) continue;
@@ -586,14 +597,16 @@ router.post('/restore', adminRequired, async (req, res, next) => {
         'INSERT INTO members (full_name, phone, email, address, created_at) VALUES ($1,$2,$3,$4,COALESCE($5::timestamptz, NOW())) RETURNING id',
         [m.full_name, m.phone || '', m.email || '', m.address || '', m.created_at || null]
       );
-      if (m.phone) phoneToId[m.phone] = r.rows[0].id;
+      const newId = r.rows[0].id;
+      if (m.phone) phoneToId[m.phone] = newId;
+      if (m.id != null) oldIdToNewId[m.id] = newId;
       memberCount++;
     }
 
-    // Nạp điểm danh (map theo member_phone)
+    // Nạp điểm danh (ưu tiên map theo member_id cũ, fallback phone)
     let checkinCount = 0;
     for (const c of (data.member_checkins || [])) {
-      const mid = phoneToId[c.member_phone];
+      const mid = (c.member_id != null && oldIdToNewId[c.member_id]) || phoneToId[c.member_phone];
       if (!mid || !c.check_date) continue;
       await client.query(
         'INSERT INTO member_checkins (member_id, check_date, check_time, created_at) VALUES ($1,$2,$3,COALESCE($4::timestamptz, NOW())) ON CONFLICT (member_id, check_date) DO NOTHING',
@@ -602,26 +615,42 @@ router.post('/restore', adminRequired, async (req, res, next) => {
       checkinCount++;
     }
 
-    // Nạp thanh toán (re-link member_id theo phone, giữ snapshot)
+    // Nạp thanh toán (re-link member_id cũ→mới, fallback phone; giữ snapshot + period/amount)
     let payCount = 0;
     for (const p of (data.payments || [])) {
       if (!p) continue;
+      const mid = (p.member_id != null && oldIdToNewId[p.member_id]) || phoneToId[p.phone] || null;
       await client.query(
-        `INSERT INTO payments (member_id, full_name, phone, email, ocr_text, is_receipt, detected_banks, status, admin_note, email_sent, created_at, confirmed_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,COALESCE($11::timestamptz, NOW()),$12::timestamptz)`,
-        [phoneToId[p.phone] || null, p.full_name || '', p.phone || '', p.email || '', p.ocr_text || '',
+        `INSERT INTO payments (member_id, full_name, phone, email, ocr_text, is_receipt, detected_banks, status, admin_note, email_sent, period, amount_received, created_at, confirmed_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,COALESCE($13::timestamptz, NOW()),$14::timestamptz)`,
+        [mid, p.full_name || '', p.phone || '', p.email || '', p.ocr_text || '',
          !!p.is_receipt, p.detected_banks || '', p.status || 'pending', p.admin_note || null,
-         !!p.email_sent, p.created_at || null, p.confirmed_at || null]
+         !!p.email_sent, p.period || null, (p.amount_received != null ? p.amount_received : null),
+         p.created_at || null, p.confirmed_at || null]
       );
       payCount++;
     }
 
-    // Nạp lại kho lưu trữ (archive_data) - giữ nguyên (keyed theo phone)
+    // Nạp lại kho lưu trữ (archive_data): remap by_member theo id cũ→mới; giữ by_phone (legacy)
     if (data.archive && Object.keys(data.archive).length) {
+      const a = data.archive;
+      const newByMember = {};
+      for (const [oldId, e] of Object.entries(a.by_member || {})) {
+        const nid = oldIdToNewId[oldId];
+        if (nid) newByMember[nid] = e;   // entry không map được (member không còn) → bỏ, total vẫn giữ
+      }
+      const payload = {
+        total: a.total || 0,
+        by_member: newByMember,
+        by_phone: a.by_phone || {},
+        by_date: a.by_date || {},
+        cutoff: a.cutoff || null,
+        updated_at: new Date().toISOString()
+      };
       await client.query(
         `INSERT INTO archive_data (id, payload, updated_at) VALUES (1, $1::jsonb, NOW())
          ON CONFLICT (id) DO UPDATE SET payload = $1::jsonb, updated_at = NOW()`,
-        [JSON.stringify(data.archive)]
+        [JSON.stringify(payload)]
       );
     }
 

@@ -4,8 +4,9 @@ const { query } = require('../lib/db');
 const { analyzeReceiptText } = require('../utils/receipt');
 const { sendPaymentConfirmation } = require('../utils/email');
 const { validateEmail, validatePhone, validateFullName } = require('../utils/validators');
-const { getClientIp, checkRateLimit } = require('../utils/ratelimit');
+const { getClientIp, checkRateLimit, peekRateLimit, incrementKey, clearKey } = require('../utils/ratelimit');
 const { getQrConfig } = require('../utils/appconfig');
+const { maskPhone, maskEmail } = require('../utils/mask');
 
 const router = express.Router();
 
@@ -41,23 +42,7 @@ async function lookupLimit(req, res, next) {
   next();
 }
 
-// Che giữa SĐT: hiện 4 số đầu + 2 số cuối (vd 0905***02) để phân biệt mà không lộ hết
-function maskPhone(p) {
-  if (!p) return '';
-  const s = String(p);
-  if (s.length <= 4) return s;
-  if (s.length <= 6) return s.slice(0, 3) + '***';
-  return s.slice(0, 4) + '***' + s.slice(-2);
-}
-// Che giữa email: hiện 3 ký tự đầu phần tên + tên miền (vd led***@gmail.com)
-function maskEmail(e) {
-  if (!e) return '';
-  const at = e.indexOf('@');
-  if (at < 0) return e.slice(0, 3) + '***';
-  const local = e.slice(0, at), domain = e.slice(at);
-  const shown = local.slice(0, Math.min(3, local.length));
-  return shown + '***' + domain;
-}
+// maskPhone / maskEmail: xem utils/mask.js (maskPhone KHÔNG lộ 4 số cuối dùng để xác minh)
 
 // ============== GỢI Ý TÊN (autocomplete) ==============
 // GET /api/public/members/search?q=...
@@ -87,7 +72,7 @@ router.get('/members/search', lookupLimit, async (req, res, next) => {
 // Kiểm tra 4 số cuối SĐT khớp với member. Trả member nếu đúng, null nếu sai.
 async function verifyLast4(memberId, last4) {
   if (!Number.isInteger(memberId) || memberId < 1) return null;
-  const r = await query('SELECT id, full_name, phone, email, address FROM members WHERE id = $1', [memberId]);
+  const r = await query('SELECT id, full_name, phone, email FROM members WHERE id = $1', [memberId]);
   const m = r.rows[0];
   if (!m) return null;
   const code = String(last4 || '').replace(/\D/g, '');
@@ -101,11 +86,24 @@ async function verifyLast4(memberId, last4) {
 router.get('/members/:id/verify', lookupLimit, async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(404).json({ error: 'Không tìm thấy thành viên' });
+
+    // Khóa chống dò 4 số cuối: tối đa 5 lần SAI / 15 phút / mỗi member (tách khỏi rate-limit IP chung)
+    const failKey = `pub:verify:fail:${id}`;
+    const lock = await peekRateLimit(failKey, 5, 15 * 60 * 1000);
+    if (lock.locked) {
+      return res.status(429).json({ error: `Nhập sai quá nhiều lần. Vui lòng thử lại sau ${Math.ceil(lock.retryAfterSec / 60)} phút.` });
+    }
+
     const m = await verifyLast4(id, req.query.last4);
     if (m && m.error === 'no_phone') {
       return res.status(400).json({ error: 'Thành viên này chưa có số điện thoại để xác minh. Vui lòng liên hệ admin.' });
     }
-    if (!m) return res.status(403).json({ error: '4 số cuối SĐT không đúng. Vui lòng thử lại.' });
+    if (!m) {
+      await incrementKey(failKey, 15 * 60 * 1000);
+      return res.status(403).json({ error: '4 số cuối SĐT không đúng. Vui lòng thử lại.' });
+    }
+    await clearKey(failKey);   // đúng → reset bộ đếm sai
     res.set('Cache-Control', 'no-store');
     res.json({ member: m });
   } catch (err) { next(err); }
