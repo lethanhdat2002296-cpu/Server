@@ -29,7 +29,7 @@
       <div id="verify-block" class="form-group" style="display:none;margin-top:14px;margin-bottom:0;">
         <label>🔒 Nhập 4 số cuối SĐT của <b id="verify-name"></b> để xác minh</label>
         <div style="display:flex;gap:8px;">
-          <input type="text" id="verify-last4" maxlength="4" inputmode="numeric" placeholder="VD: 9602"
+          <input type="text" id="verify-last4" maxlength="4" inputmode="numeric" placeholder="VD: 9602" aria-label="4 số cuối số điện thoại"
                  style="flex:1;padding:12px 14px;border:1.5px solid #dfe6e9;border-radius:10px;font-size:18px;letter-spacing:4px;text-align:center;font-family:monospace;">
           <button type="button" id="verify-btn" class="btn-primary" style="width:auto;padding:0 22px;">Xác minh</button>
         </div>
@@ -120,7 +120,7 @@
     <div class="auth-card" style="padding:22px;margin-top:18px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <div class="card-title" style="margin-bottom:0;">📋 Lịch sử thanh toán</div>
-        <button type="button" class="btn-secondary" id="hist-refresh" style="width:auto;padding:6px 12px;font-size:12px;" disabled>🔄</button>
+        <button type="button" class="btn-secondary" id="hist-refresh" aria-label="Tải lại lịch sử thanh toán" title="Tải lại" style="width:auto;padding:6px 12px;font-size:12px;" disabled>🔄</button>
       </div>
       <div id="hist-list">
         <div class="empty-state" style="padding:24px 10px;">

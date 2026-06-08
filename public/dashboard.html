@@ -139,6 +139,11 @@
       <div class="modal" style="max-width:480px;">
         <div class="modal-title" id="pay-modal-title">Xác nhận thanh toán</div>
         <div class="modal-desc" id="pay-modal-desc"></div>
+        <div class="form-group" id="pay-modal-amount-group">
+          <label>Số tiền thực thu (VND)</label>
+          <input type="number" id="pay-modal-amount" min="0" style="width:100%;padding:10px;border:1.5px solid #dfe6e9;border-radius:8px;font-size:14px;">
+          <div style="font-size:11px;color:#95a5a6;margin-top:4px;">Mặc định = mức phí cấu hình. Sửa nếu thu khác.</div>
+        </div>
         <div class="form-group">
           <label>Ghi chú (gửi kèm email cho người nộp)</label>
           <textarea id="pay-modal-note" rows="3" maxlength="500" style="width:100%;padding:10px;border:1.5px solid #dfe6e9;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;"></textarea>
@@ -233,7 +238,7 @@
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <div style="font-weight:600;">🔥 Top chuỗi liên tiếp</div>
-              <button class="btn-secondary" id="lb-streak-export" style="width:auto;padding:5px 12px;font-size:12px;">📥</button>
+              <button class="btn-secondary" id="lb-streak-export" aria-label="Xuất Excel top chuỗi liên tiếp" title="Xuất Excel" style="width:auto;padding:5px 12px;font-size:12px;">📥</button>
             </div>
             <div style="overflow-x:auto;">
               <table class="report-table" id="lb-streak-table">
@@ -245,7 +250,7 @@
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <div style="font-weight:600;">⭐ Top tổng ngày dậy</div>
-              <button class="btn-secondary" id="lb-total-export" style="width:auto;padding:5px 12px;font-size:12px;">📥</button>
+              <button class="btn-secondary" id="lb-total-export" aria-label="Xuất Excel top tổng ngày dậy" title="Xuất Excel" style="width:auto;padding:5px 12px;font-size:12px;">📥</button>
             </div>
             <div style="overflow-x:auto;">
               <table class="report-table" id="lb-total-table">

@@ -107,6 +107,13 @@ async function exportToExcel(rows, sheetName, fileName, headers) {
 document.getElementById('topbar-username').textContent = cachedUser.full_name || cachedUser.username || '';
 document.getElementById('btn-logout').addEventListener('click', () => { localStorage.clear(); window.location.href = '/'; });
 
+// Đóng mọi modal đang mở bằng phím Escape (a11y)
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+  }
+});
+
 // Điền link trang thanh toán thật vào hướng dẫn
 (() => { const el = document.getElementById('guide-pay-link'); if (el) el.textContent = location.origin + '/payment.html'; })();
 
@@ -357,9 +364,9 @@ async function loadMembers() {
       <td>${escapeText(m.email||'—')}</td>
       <td>${escapeText(m.address||'—')}</td>
       <td style="white-space:nowrap;">
-        <button class="btn-secondary" data-view="${m.id}" style="padding:5px 10px;border-radius:6px;font-size:12px;width:auto;">👁</button>
-        <button class="btn-secondary" data-edit="${m.id}" style="padding:5px 10px;border-radius:6px;font-size:12px;width:auto;">✏</button>
-        <button class="btn-reject" data-del="${m.id}" data-name="${escapeText(m.full_name)}" style="padding:5px 10px;border-radius:6px;font-size:12px;">🗑</button>
+        <button class="btn-secondary" data-view="${m.id}" aria-label="Xem chi tiết" title="Xem chi tiết" style="padding:5px 10px;border-radius:6px;font-size:12px;width:auto;">👁</button>
+        <button class="btn-secondary" data-edit="${m.id}" aria-label="Sửa thành viên" title="Sửa" style="padding:5px 10px;border-radius:6px;font-size:12px;width:auto;">✏</button>
+        <button class="btn-reject" data-del="${m.id}" data-name="${escapeText(m.full_name)}" aria-label="Xóa thành viên" title="Xóa" style="padding:5px 10px;border-radius:6px;font-size:12px;">🗑</button>
       </td>
     </tr>`).join('');
   tbody.querySelectorAll('button[data-del]').forEach(b => b.addEventListener('click', async () => {
@@ -571,21 +578,37 @@ async function loadPayments() {
   renderPagination('pay-pagination', r.data.total||0, payPage, PAY_PAGE, p => { payPage=p; loadPayments(); });
 }
 
-function openPayModal(action, id, name) {
+let cachedQrAmount = null;
+async function getQrAmount() {
+  if (cachedQrAmount != null) return cachedQrAmount;
+  try {
+    const r = await fetch('/api/public/payment-config');
+    const d = await r.json();
+    cachedQrAmount = (d.config && parseInt(d.config.amount, 10)) || 0;
+  } catch (e) { cachedQrAmount = 0; }
+  return cachedQrAmount;
+}
+
+async function openPayModal(action, id, name) {
   const modal = document.getElementById('pay-modal');
   modal.dataset.action = action; modal.dataset.id = id;
   document.getElementById('pay-modal-msg').className = 'message';
   document.getElementById('pay-modal-note').value = '';
+  const amtGroup = document.getElementById('pay-modal-amount-group');
   if (action === 'confirm') {
     document.getElementById('pay-modal-title').textContent = `✓ Xác nhận thanh toán #${id}`;
     document.getElementById('pay-modal-desc').textContent = `Email xác nhận sẽ gửi đến "${name}".`;
     document.getElementById('pay-modal-confirm').textContent = 'Xác nhận';
+    amtGroup.style.display = '';
+    document.getElementById('pay-modal-amount').value = await getQrAmount();
   } else {
     document.getElementById('pay-modal-title').textContent = `✗ Từ chối thanh toán #${id}`;
     document.getElementById('pay-modal-desc').textContent = `"${name}" sẽ nhận email lý do từ chối.`;
     document.getElementById('pay-modal-confirm').textContent = 'Từ chối';
+    amtGroup.style.display = 'none';
   }
   modal.classList.add('show');
+  setTimeout(() => { (action === 'confirm' ? document.getElementById('pay-modal-amount') : document.getElementById('pay-modal-note')).focus(); }, 50);
 }
 
 async function submitPayAction() {
@@ -594,8 +617,13 @@ async function submitPayAction() {
   const note = document.getElementById('pay-modal-note').value.trim();
   const btn = document.getElementById('pay-modal-confirm');
   const msg = document.getElementById('pay-modal-msg');
+  const body = { note };
+  if (action === 'confirm') {
+    const amt = parseInt(document.getElementById('pay-modal-amount').value, 10);
+    if (Number.isFinite(amt) && amt >= 0) body.amount_received = amt;
+  }
   btn.disabled = true; btn.textContent = 'Đang xử lý...';
-  const r = await api('POST', `/api/admin/payments/${id}/${action}`, { note });
+  const r = await api('POST', `/api/admin/payments/${id}/${action}`, body);
   if (r && r.ok) {
     msg.className = 'message show success';
     msg.textContent = r.data.email_sent ? '✓ Đã xử lý + gửi email' : '⚠ Đã xử lý, email lỗi: ' + (r.data.email_error||'');
