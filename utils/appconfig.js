@@ -47,4 +47,13 @@ async function saveQrConfig(cfg) {
   return clean;
 }
 
-module.exports = { getQrConfig, saveQrConfig, DEFAULT_QR, TEMPLATES };
+// Sinh URL ảnh VietQR từ cấu hình (dùng chung; bản client ở public/js/qr.js phải khớp).
+// encodeURIComponent để dấu cách thành %20 (không thành '+') giữ nội dung CK đúng.
+function buildVietQrUrl(cfg) {
+  cfg = cfg || {};
+  const base = `https://img.vietqr.io/image/${encodeURIComponent(cfg.bank_id)}-${encodeURIComponent(cfg.account_no)}-${encodeURIComponent(cfg.template || 'print')}.png`;
+  const q = `amount=${encodeURIComponent(cfg.amount || 0)}&addInfo=${encodeURIComponent(cfg.description || '')}&accountName=${encodeURIComponent(cfg.account_name || '')}`;
+  return `${base}?${q}`;
+}
+
+module.exports = { getQrConfig, saveQrConfig, DEFAULT_QR, TEMPLATES, buildVietQrUrl };

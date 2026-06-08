@@ -343,12 +343,7 @@ document.getElementById('pay-again').addEventListener('click', () => {
 const QR_TTL = 120;
 let qrTimer = null, qrConfig = null;
 
-function buildVietQrUrl(cfg) {
-  const base = `https://img.vietqr.io/image/${encodeURIComponent(cfg.bank_id)}-${encodeURIComponent(cfg.account_no)}-${encodeURIComponent(cfg.template || 'print')}.png`;
-  // Dùng encodeURIComponent (dấu cách → %20) để nội dung CK đúng "5AM Club", không thành "5AM+Club"
-  const q = `amount=${encodeURIComponent(cfg.amount || 0)}&addInfo=${encodeURIComponent(cfg.description || '')}&accountName=${encodeURIComponent(cfg.account_name || '')}`;
-  return `${base}?${q}`;
-}
+// buildVietQrUrl: dùng chung từ public/js/qr.js (window.buildVietQrUrl)
 function fmtVnd(n) { try { return Number(n).toLocaleString('vi-VN'); } catch (e) { return n; } }
 
 function startQrCountdown() {

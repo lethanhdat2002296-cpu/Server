@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import receipt from '../utils/receipt.js';
-const { analyzeReceiptText } = receipt;
+const { analyzeReceiptText, extractAmount } = receipt;
 
 describe('analyzeReceiptText', () => {
   it('rỗng/không phải chuỗi → không phải biên lai', () => {
@@ -28,5 +28,25 @@ describe('analyzeReceiptText', () => {
     expect(r.detected_banks).not.toContain('VND');
     expect(r.detected_banks).not.toContain('SUCCESS');
     expect(r.detected_banks).toContain('MBBANK');
+  });
+
+  it('CHỈ từ generic (VND/DONG/SUCCESS) → KHÔNG phải biên lai (giảm dương tính giả)', () => {
+    expect(analyzeReceiptText('VND DONG SUCCESS').is_receipt).toBe(false);
+  });
+});
+
+describe('extractAmount', () => {
+  it('lấy số tiền có phân tách (500.000)', () => {
+    expect(extractAmount('So tien: 500.000 VND')).toBe(500000);
+  });
+  it('lấy số tiền dạng 1,500,000', () => {
+    expect(extractAmount('Amount 1,500,000d')).toBe(1500000);
+  });
+  it('bỏ qua số tài khoản dài, lấy đúng số tiền', () => {
+    expect(extractAmount('STK 19036020562019 so tien 500000')).toBe(500000);
+  });
+  it('không có số tiền hợp lý → null', () => {
+    expect(extractAmount('khong co so')).toBeNull();
+    expect(extractAmount('')).toBeNull();
   });
 });

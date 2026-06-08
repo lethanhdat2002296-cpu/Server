@@ -541,11 +541,16 @@ async function loadPayments() {
     const emailFail = (!isPending && p.email_sent === false) ? '<span class="badge rejected">📧 Email lỗi</span>' : '';
     const noMatch = !p.member_id ? '<span class="badge pending">⚠ Chưa khớp TV</span>' : '';
     const note = p.admin_note ? `<div class="adm-pay-sub" style="font-style:italic;">💬 ${escapeText(p.admin_note)}</div>` : '';
+    const periodStr = p.period ? `📅 Kỳ ${escapeText(p.period)}` : '';
+    const ocrAmt = p.detected_amount ? ` • 💵 OCR: ${Number(p.detected_amount).toLocaleString('vi-VN')}đ` : '';
+    const recvAmt = (p.status === 'confirmed' && p.amount_received != null) ? ` • ✅ Thu: ${Number(p.amount_received).toLocaleString('vi-VN')}đ` : '';
+    const moneyLine = (periodStr || ocrAmt || recvAmt) ? `<div class="adm-pay-sub">${periodStr}${ocrAmt}${recvAmt}</div>` : '';
     return `<div class="adm-pay-item">
       <div class="adm-pay-info">
         <div class="adm-pay-name">#${p.id} - ${escapeText(p.full_name)} ${badge} ${ocr} ${emailFail} ${noMatch}</div>
         <div class="adm-pay-sub">📞 ${escapeText(p.phone)} • 📧 ${escapeText(p.email)}</div>
         <div class="adm-pay-sub">🕐 ${date}${p.detected_banks?` • 🏦 ${escapeText(p.detected_banks)}`:''}</div>
+        ${moneyLine}
         ${note}
       </div>
       <div class="adm-pay-actions">
@@ -933,11 +938,7 @@ function initSettingsTab() {
 }
 
 // Sinh URL ảnh VietQR từ cấu hình
-function buildVietQrUrl(cfg) {
-  const base = `https://img.vietqr.io/image/${encodeURIComponent(cfg.bank_id)}-${encodeURIComponent(cfg.account_no)}-${encodeURIComponent(cfg.template || 'print')}.png`;
-  const q = `amount=${encodeURIComponent(cfg.amount || 0)}&addInfo=${encodeURIComponent(cfg.description || '')}&accountName=${encodeURIComponent(cfg.account_name || '')}`;
-  return `${base}?${q}`;
-}
+// buildVietQrUrl: dùng chung từ public/js/qr.js (window.buildVietQrUrl)
 function fillQrForm(cfg) {
   const f = document.getElementById('qr-form');
   f.bank_id.value = cfg.bank_id || '';

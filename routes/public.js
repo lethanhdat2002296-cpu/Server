@@ -5,7 +5,7 @@ const { analyzeReceiptText } = require('../utils/receipt');
 const { sendPaymentConfirmation } = require('../utils/email');
 const { validateEmail, validatePhone, validateFullName } = require('../utils/validators');
 const { getClientIp, checkRateLimit, peekRateLimit, incrementKey, clearKey } = require('../utils/ratelimit');
-const { getQrConfig } = require('../utils/appconfig');
+const { getQrConfig, buildVietQrUrl } = require('../utils/appconfig');
 const { maskPhone, maskEmail } = require('../utils/mask');
 const { nowInTimezone } = require('../utils/time');
 
@@ -24,9 +24,7 @@ router.get('/payment-config', async (req, res, next) => {
 router.get('/qr-download', async (req, res, next) => {
   try {
     const cfg = await getQrConfig();
-    const url = `https://img.vietqr.io/image/${encodeURIComponent(cfg.bank_id)}-${encodeURIComponent(cfg.account_no)}-${encodeURIComponent(cfg.template || 'print')}.png`
-      + `?amount=${encodeURIComponent(cfg.amount || 0)}&addInfo=${encodeURIComponent(cfg.description || '')}&accountName=${encodeURIComponent(cfg.account_name || '')}`;
-    const r = await fetch(url);
+    const r = await fetch(buildVietQrUrl(cfg));
     if (!r.ok) return res.status(502).json({ error: 'Không tải được mã QR từ VietQR' });
     const buf = Buffer.from(await r.arrayBuffer());
     res.set('Content-Type', 'image/png');
@@ -162,41 +160,46 @@ router.post('/payment', async (req, res, next) => {
         fields: { full_name: 'Chưa chọn tên từ danh sách' }
       });
     }
-    const m = await query('SELECT id FROM members WHERE id = $1', [parseInt(member_id, 10)]);
+    const m = await query('SELECT id, phone, email FROM members WHERE id = $1', [parseInt(member_id, 10)]);
     if (!m.rows.length) {
       return res.status(400).json({
         error: 'Tên bạn chọn không còn trong danh sách. Vui lòng chọn lại hoặc liên hệ admin.',
         fields: { full_name: 'Thành viên không tồn tại' }
       });
     }
-    const memberId = m.rows[0].id;
+    const member = m.rows[0];
+    const memberId = member.id;
+    // NGUỒN CHÂN LÝ: ưu tiên SĐT/email từ hồ sơ member (chống gắn tên người khác + gửi mail sai người)
+    const effPhone = member.phone || phone;
+    const effEmail = (member.email || email).toLowerCase();
 
     const analysis = analyzeReceiptText(ocr_text);
 
     const period = nowInTimezone().date.slice(0, 7);  // 'YYYY-MM' kỳ đóng phí theo giờ VN
     const insertRes = await query(`
-      INSERT INTO payments (member_id, full_name, phone, email, ocr_text, is_receipt, detected_banks, status, period)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
+      INSERT INTO payments (member_id, full_name, phone, email, ocr_text, is_receipt, detected_banks, status, period, detected_amount)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9)
       RETURNING id, created_at
     `, [
       memberId,
       full_name.trim(),
-      phone,
-      email.toLowerCase(),
+      effPhone,
+      effEmail,
       ocr_text || '',
       analysis.is_receipt,
       analysis.detected_banks.join(', '),
-      period
+      period,
+      analysis.detected_amount
     ]);
     const payment = insertRes.rows[0];
 
-    // Gửi email "đã nhận - chờ xác nhận"
+    // Gửi email "đã nhận - chờ xác nhận" (đến email hồ sơ)
     let emailResult = { ok: false };
     try {
       emailResult = await sendPaymentConfirmation({
-        toEmail: email,
+        toEmail: effEmail,
         full_name,
-        phone,
+        phone: effPhone,
         payment_id: payment.id,
         created_at: payment.created_at,
         is_receipt: analysis.is_receipt,

@@ -8,24 +8,23 @@ function getClientIp(req) {
   return req.ip || (req.socket && req.socket.remoteAddress) || 'unknown';
 }
 
-// Trả { allowed, retryAfterSec }. Cửa sổ trượt đơn giản theo window_start.
+// Trả { allowed, retryAfterSec }. 1 câu UPSERT NGUYÊN TỬ (chống race vượt ngưỡng).
 async function checkRateLimit(key, max, windowMs) {
   const now = Date.now();
   try {
-    const r = await query('SELECT count, window_start FROM rate_limits WHERE key = $1', [key]);
+    // Hết cửa sổ → reset count=1 + window mới; còn cửa sổ → count+1. RETURNING giá trị mới.
+    const r = await query(`
+      INSERT INTO rate_limits (key, count, window_start) VALUES ($1, 1, $2)
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE WHEN $2 - rate_limits.window_start > $3 THEN 1 ELSE rate_limits.count + 1 END,
+        window_start = CASE WHEN $2 - rate_limits.window_start > $3 THEN $2 ELSE rate_limits.window_start END
+      RETURNING count, window_start
+    `, [key, now, windowMs]);
     const row = r.rows[0];
-    if (!row || now - Number(row.window_start) > windowMs) {
-      await query(`
-        INSERT INTO rate_limits (key, count, window_start) VALUES ($1, 1, $2)
-        ON CONFLICT (key) DO UPDATE SET count = 1, window_start = $2
-      `, [key, now]);
-      return { allowed: true };
-    }
-    if (row.count >= max) {
+    if (row.count > max) {
       const retryAfterSec = Math.ceil((windowMs - (now - Number(row.window_start))) / 1000);
-      return { allowed: false, retryAfterSec };
+      return { allowed: false, retryAfterSec: Math.max(1, retryAfterSec) };
     }
-    await query('UPDATE rate_limits SET count = count + 1 WHERE key = $1', [key]);
     return { allowed: true };
   } catch (e) {
     // Nếu lỗi rate-limit DB thì cho qua (không chặn dịch vụ)
