@@ -679,7 +679,7 @@ async function loadRangeReport(from, to) {
 }
 async function reloadAllReports() {
   const date = validateReportDate(document.getElementById('rep-date').value);
-  await Promise.all([loadReportOverview(), loadReportDaily(date), loadReportDetailed(date), loadLeaderboard()]);
+  await Promise.all([loadReportOverview(), loadReportDaily(date), loadReportDetailed(date), loadLeaderboard(), loadDues()]);
 }
 
 let lastLb = null;
@@ -699,6 +699,37 @@ async function loadLeaderboard() {
   };
   fill('#lb-streak-table tbody', r.data.by_streak || [], 'streak', 'ngày');
   fill('#lb-total-table tbody', r.data.by_total || [], 'total_checked', 'ngày');
+}
+
+// ===== Công nợ theo kỳ (phí thành viên định kỳ) =====
+let lastDues = null;
+function vndFmt(n) { try { return Number(n || 0).toLocaleString('vi-VN'); } catch (e) { return n; } }
+async function loadDues() {
+  const el = document.getElementById('dues-period');
+  if (!el) return;
+  const period = (el.value || '').trim();
+  const q = /^\d{4}-\d{2}$/.test(period) ? `?period=${period}` : '';
+  const r = await api('GET', '/api/admin/reports/dues' + q);
+  if (!r || !r.ok) return;
+  lastDues = r.data;
+  const s = r.data.summary;
+  document.getElementById('dues-summary').innerHTML =
+    `Kỳ <b>${escapeText(r.data.period)}</b> • Tổng <b>${s.total}</b> · ` +
+    `✅ Đã đóng <b style="color:#27ae60;">${s.paid}</b> · ⏳ Chờ duyệt <b style="color:#f39c12;">${s.pending}</b> · ` +
+    `❌ Chưa đóng <b style="color:#e74c3c;">${s.unpaid}</b><br>` +
+    `Đã thu <b>${vndFmt(s.collected)}đ</b> / dự kiến ${vndFmt(s.expected)}đ (mức ${vndFmt(r.data.amount_per)}đ/người)`;
+  const tb = document.querySelector('#dues-table tbody');
+  if (!r.data.rows.length) { tb.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#95a5a6;">Chưa có thành viên</td></tr>'; return; }
+  const badge = st => st === 'paid' ? '<span class="badge confirmed">✅ Đã đóng</span>'
+    : st === 'pending' ? '<span class="badge pending">⏳ Chờ duyệt</span>'
+    : '<span class="badge rejected">❌ Chưa đóng</span>';
+  tb.innerHTML = r.data.rows.map((x, i) => `<tr>
+    <td class="num">${i + 1}</td>
+    <td>${escapeText(x.full_name)}</td>
+    <td>${escapeText(x.phone || '')}</td>
+    <td>${badge(x.status)}</td>
+    <td class="num">${x.status === 'paid' ? vndFmt(x.amount_received) + 'đ' : ''}</td>
+  </tr>`).join('');
 }
 
 function initReportsTab() {
@@ -769,6 +800,22 @@ function initReportsTab() {
     exportToExcel(lastLb.by_total, 'Top tong ngay', 'top-tong-ngay.xlsx', [
       { key:'_', label:'Hạng', width:8 }, { key:'full_name', label:'Họ và tên', width:28 },
       { key:'phone', label:'Số điện thoại', width:16 }, { key:'total_checked', label:'Tổng ngày dậy', width:16 }]);
+  });
+
+  // Công nợ theo kỳ
+  const duesPeriod = document.getElementById('dues-period');
+  duesPeriod.value = today.slice(0, 7);
+  duesPeriod.max = today.slice(0, 7);
+  document.getElementById('dues-load').addEventListener('click', loadDues);
+  duesPeriod.addEventListener('change', loadDues);
+  document.getElementById('dues-export').addEventListener('click', () => {
+    if (!lastDues) return alert('Chưa có dữ liệu');
+    const label = { paid: 'Đã đóng', pending: 'Chờ duyệt', unpaid: 'Chưa đóng' };
+    exportToExcel(lastDues.rows, `Cong no ${lastDues.period}`, `cong-no-${lastDues.period}.xlsx`, [
+      { key: '_', label: 'STT', width: 6 }, { key: 'full_name', label: 'Họ và tên', width: 28 },
+      { key: 'phone', label: 'Số điện thoại', width: 16 }, { key: 'email', label: 'Email', width: 30 },
+      { key: 'status', label: 'Trạng thái', value: r => label[r.status] || r.status, width: 14 },
+      { key: 'amount_received', label: 'Số tiền', value: r => r.status === 'paid' ? r.amount_received : 0, width: 14 }]);
   });
 
   const wk = computeRange('week');

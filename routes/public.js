@@ -7,6 +7,7 @@ const { validateEmail, validatePhone, validateFullName } = require('../utils/val
 const { getClientIp, checkRateLimit, peekRateLimit, incrementKey, clearKey } = require('../utils/ratelimit');
 const { getQrConfig } = require('../utils/appconfig');
 const { maskPhone, maskEmail } = require('../utils/mask');
+const { nowInTimezone } = require('../utils/time');
 
 const router = express.Router();
 
@@ -172,9 +173,10 @@ router.post('/payment', async (req, res, next) => {
 
     const analysis = analyzeReceiptText(ocr_text);
 
+    const period = nowInTimezone().date.slice(0, 7);  // 'YYYY-MM' kỳ đóng phí theo giờ VN
     const insertRes = await query(`
-      INSERT INTO payments (member_id, full_name, phone, email, ocr_text, is_receipt, detected_banks, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+      INSERT INTO payments (member_id, full_name, phone, email, ocr_text, is_receipt, detected_banks, status, period)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
       RETURNING id, created_at
     `, [
       memberId,
@@ -183,7 +185,8 @@ router.post('/payment', async (req, res, next) => {
       email.toLowerCase(),
       ocr_text || '',
       analysis.is_receipt,
-      analysis.detected_banks.join(', ')
+      analysis.detected_banks.join(', '),
+      period
     ]);
     const payment = insertRes.rows[0];
 

@@ -121,8 +121,15 @@ router.post('/payments/:id/confirm', adminRequired, async (req, res, next) => {
     if (!payment) return res.status(404).json({ error: 'Không tìm thấy thanh toán' });
     if (payment.status === 'confirmed') return res.status(400).json({ error: 'Đã xác nhận trước đó' });
 
-    await query(`UPDATE payments SET status='confirmed', confirmed_at=NOW(), confirmed_by=$1, admin_note=$2 WHERE id=$3`,
-      [req.user.id, adminNote, paymentId]);
+    // Số tiền thực thu: lấy từ body, mặc định = cấu hình QR (phí định kỳ)
+    let amount = parseInt((req.body && req.body.amount_received), 10);
+    if (!Number.isFinite(amount) || amount < 0) {
+      const cfg = await getQrConfig();
+      amount = parseInt(cfg.amount, 10) || 0;
+    }
+
+    await query(`UPDATE payments SET status='confirmed', confirmed_at=NOW(), confirmed_by=$1, admin_note=$2, amount_received=$3 WHERE id=$4`,
+      [req.user.id, adminNote, amount, paymentId]);
 
     let emailResult = { ok: false };
     try {
@@ -404,6 +411,65 @@ router.get('/reports/range', adminRequired, async (req, res, next) => {
       total_members: totalRes.rows[0].c,
       total_checkins: daily.reduce((s, d) => s + d.count, 0),
       daily, per_member: perMemberRes.rows
+    });
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+//  CÔNG NỢ THEO KỲ (membership fee định kỳ)
+// ============================================================
+// GET /reports/dues?period=YYYY-MM → ai đã đóng / chờ duyệt / chưa đóng trong kỳ
+router.get('/reports/dues', adminRequired, async (req, res, next) => {
+  try {
+    let period = String(req.query.period || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(period)) period = nowInTimezone().date.slice(0, 7); // mặc định tháng hiện tại
+
+    const [rowsRes, cfg] = await Promise.all([
+      query(`
+        WITH per_member AS (
+          SELECT DISTINCT ON (member_id) member_id, status, amount_received
+          FROM payments
+          WHERE period = $1 AND member_id IS NOT NULL
+          ORDER BY member_id, (status = 'confirmed') DESC, created_at DESC
+        )
+        SELECT m.id, m.full_name, m.phone, m.email,
+               COALESCE(pm.status, 'none') AS pay_status,
+               pm.amount_received
+        FROM members m
+        LEFT JOIN per_member pm ON pm.member_id = m.id
+        ORDER BY m.full_name
+      `, [period]),
+      getQrConfig()
+    ]);
+
+    const amountPer = parseInt(cfg.amount, 10) || 0;
+    const rows = rowsRes.rows.map(r => {
+      const status = r.pay_status === 'confirmed' ? 'paid'
+                   : r.pay_status === 'pending' ? 'pending'
+                   : 'unpaid'; // 'none' hoặc 'rejected'
+      return {
+        id: r.id, full_name: r.full_name, phone: r.phone, email: r.email,
+        status, amount_received: status === 'paid' ? (r.amount_received != null ? Number(r.amount_received) : amountPer) : 0
+      };
+    });
+    const paid = rows.filter(r => r.status === 'paid');
+    const pending = rows.filter(r => r.status === 'pending');
+    const unpaid = rows.filter(r => r.status === 'unpaid');
+    const collected = paid.reduce((s, r) => s + (r.amount_received || 0), 0);
+
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      period,
+      amount_per: amountPer,
+      summary: {
+        total: rows.length,
+        paid: paid.length,
+        pending: pending.length,
+        unpaid: unpaid.length,
+        expected: rows.length * amountPer,
+        collected
+      },
+      rows
     });
   } catch (err) { next(err); }
 });
