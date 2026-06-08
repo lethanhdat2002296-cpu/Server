@@ -25,9 +25,10 @@
       <div class="contact-row">
         <!-- EDIT: contact details -->
         <a class="chip" href="mailto:lethanhdat2002296@gmail.com">✉️ lethanhdat2002296@gmail.com</a>
-        <span class="chip">📞 [[your phone]]</span>
+        <a class="chip" href="tel:+84905729602">📞 0905 729 602</a>
+        <!-- EDIT: add your LinkedIn URL between the quotes -->
         <a class="chip" href="[[your-linkedin-url]]">in LinkedIn</a>
-        <span class="chip">📍 [[your city]], Vietnam</span>
+        <span class="chip">📍 Ho Chi Minh City, Vietnam</span>
       </div>
 
       <div class="cta-row no-print">
@@ -127,10 +128,16 @@
       <div class="card">
         <div class="block">
           <h3>🎯 Problem</h3>
-          <p>A “wake-up at 5AM” accountability group tracks daily attendance and collects a <b>recurring membership
-             fee</b>. Everything was manual — attendance in chat, fees reconciled by hand in spreadsheets. It was
-             error-prone, time-consuming, and the group could never answer the key question: <b>“who hasn't paid this
-             period?”</b></p>
+          <p>A “wake-up at 5AM” group asks its members to check in within a strict <b>5:00–5:30 AM</b> window and to pay a
+             <b>recurring tuition / membership fee</b>. Before the product, <b>everything was done by hand</b> — attendance
+             tracked in group chat, fees and bank receipts reconciled manually in spreadsheets, results compiled member by
+             member. It was slow, error-prone, and the group could never quickly answer: <b>“who actually woke up — and
+             who still hasn't paid this period?”</b></p>
+        </div>
+        <div class="block">
+          <h3>💡 Product goal</h3>
+          <p>Give the admin <b>one place to manage everything about each member</b> — early-morning attendance, fee
+             payments, and reports/results — replacing scattered manual tracking with a single, reliable source of truth.</p>
         </div>
         <div class="block">
           <h3>👥 Users</h3>
@@ -145,12 +152,15 @@
             <div class="decision"><b>Removed member logins; admin owns the roster.</b>
               <div class="why">Members won't maintain accounts. Importing from Excel + admin-driven check-in removed the
               biggest adoption barrier — at the cost of self-service, which members didn't need.</div></div>
-            <div class="decision"><b>Strict 5:00–5:59 window, no make-up check-in.</b>
+            <div class="decision"><b>Strict 5:00–5:30 AM window, no make-up check-in.</b>
               <div class="why">The product's whole purpose is the habit. Integrity of the streak was prioritized over
               convenience — a deliberate “opinionated product” choice.</div></div>
             <div class="decision"><b>Public payment page with 4-digit phone verification.</b>
               <div class="why">Balanced accessibility (no login) against privacy. Members prove identity with the last 4
               digits of their phone before any personal data or history is shown; brute-force is rate-limited.</div></div>
+            <div class="decision"><b>Email built into the payment workflow.</b>
+              <div class="why">Every receipt submission and every admin approval/rejection sends an automated email. This
+              gives the admin <b>tight, auditable control over payments</b> — no more ad-hoc “did you pay?” chat messages.</div></div>
             <div class="decision"><b>Period-based fee model + “unpaid this period” report.</b>
               <div class="why">The highest-value feature. Turned opaque, manual reconciliation into a one-screen answer:
               who paid / pending / unpaid, with expected-vs-collected totals and one-click reminders.</div></div>
@@ -199,7 +209,7 @@
         <div class="mock">
           <div class="bar"><i></i><i></i><i></i><span class="t">Check-in</span></div>
           <div class="body">
-            <div class="mt">✅ 5:00–5:59 window</div>
+            <div class="mt">✅ 5:00–5:30 window</div>
             <div class="mrow"><span class="nm">An N.</span><span class="badge ok">✓</span></div>
             <div class="mrow"><span class="nm">Bình T.</span><span class="badge ok">✓</span></div>
             <div class="mrow"><span class="nm">Cường L.</span><span class="badge no">—</span></div>
