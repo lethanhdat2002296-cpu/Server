@@ -433,8 +433,8 @@
           <li><b>Admin import danh sách</b> thành viên từ file Excel (1 lần đầu, cập nhật khi có người mới).</li>
           <li><b>Mỗi sáng 5:00–5:59</b>, admin mở tab Điểm danh, tích những người có mặt.</li>
           <li><b>Thành viên gửi biên lai</b> chuyển phí qua 1 trang web công khai (không cần đăng nhập).</li>
-          <li><b>Admin duyệt</b> biên lai → hệ thống tự gửi email xác nhận cho thành viên.</li>
-          <li><b>Xem báo cáo</b>, bảng xếp hạng, và <b>sao lưu</b> dữ liệu định kỳ.</li>
+          <li><b>Admin duyệt</b> biên lai (ghi <b>số tiền thực thu</b>) → hệ thống tự gửi email xác nhận.</li>
+          <li><b>Theo dõi công nợ theo kỳ</b> (ai chưa đóng phí tháng này), <b>xem báo cáo</b>, bảng xếp hạng, và <b>sao lưu</b> định kỳ.</li>
         </ol>
         <div class="callout info">💡 Chỉ <b>admin</b> đăng nhập trang này. Thành viên KHÔNG có tài khoản — họ chỉ vào trang gửi biên lai.</div>
       </div>
@@ -469,16 +469,30 @@
         <p style="font-size:14px;line-height:1.7;"><b>Thành viên gửi biên lai thế nào:</b></p>
         <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
           <li>Mở link công khai: <b><span id="guide-pay-link">.../payment.html</span></b> (gửi link này cho cả nhóm).</li>
+          <li>Trang có sẵn <b>mã QR VietQR</b> để quét chuyển khoản — kèm nút <b>copy số tiền / nội dung CK</b> và <b>tải mã QR về máy</b>.</li>
           <li>Gõ tên → chọn đúng tên → <b>nhập 4 số cuối SĐT</b> để xác minh → tự điền thông tin → đính ảnh biên lai → gửi.</li>
           <li>Họ tự xem trạng thái duyệt ở cột "Lịch sử" bên trái cùng trang.</li>
         </ul>
         <p style="font-size:14px;line-height:1.7;"><b>Admin xử lý (tab Thanh toán):</b></p>
         <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
           <li>Lọc theo trạng thái (Chờ / Đã duyệt / Từ chối) hoặc tìm theo tên/SĐT/email.</li>
-          <li><b>✓ Duyệt</b> hoặc <b>✗ Từ chối</b> (kèm ghi chú) → hệ thống tự gửi email kết quả cho thành viên.</li>
+          <li><b>✓ Duyệt</b> (nhập <b>số tiền thực thu</b> — mặc định = mức phí cấu hình) hoặc <b>✗ Từ chối</b> (kèm ghi chú) → hệ thống tự gửi email kết quả.</li>
+          <li>Mỗi biên lai hiện <b>📅 kỳ</b> (tháng), <b>💵 số tiền OCR đọc được</b>, và <b>✅ số tiền đã thu</b> để đối soát nhanh.</li>
           <li>Nếu email gửi lỗi → có badge "📧 Email lỗi" + nút "Gửi lại".</li>
           <li>Badge "⚠ Chưa khớp TV" = biên lai không gắn với thành viên nào (hiếm, kiểm tra lại).</li>
         </ul>
+      </div>
+
+      <!-- Thu phí theo kỳ -->
+      <div class="card">
+        <div class="card-title">💰 Thu phí & Công nợ theo kỳ</div>
+        <p style="font-size:14px;line-height:1.7;">Hệ thống quản lý <b>phí thành viên định kỳ theo tháng</b> (kỳ dạng <code>YYYY-MM</code>). Mỗi biên lai tự gắn kỳ theo thời điểm gửi.</p>
+        <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
+          <li><b>Cấu hình mức phí + tài khoản nhận:</b> tab <b>Cài đặt</b> → "Cấu hình QR thanh toán" (ngân hàng, số TK, tên, <b>số tiền</b>, nội dung CK). Bấm "👁 Xem thử" rồi "📥 Tải QR (để in)". Mã QR ở trang công khai tự sinh theo cấu hình này.</li>
+          <li><b>Báo cáo công nợ:</b> tab <b>Báo cáo</b> → thẻ "💰 Công nợ theo kỳ". Chọn tháng → xem ai <b>✅ đã đóng / ⏳ chờ duyệt / ❌ chưa đóng</b>, kèm <b>tổng dự kiến vs đã thu</b>. Có nút <b>📥 Excel</b>.</li>
+          <li><b>✉️ Nhắc chưa đóng:</b> gửi email nhắc cho những người chưa đóng kỳ đó (chỉ người có email). Tối đa 30 email/lần — bấm lại để gửi tiếp nếu danh sách dài.</li>
+        </ul>
+        <div class="callout info">💡 "Đã đóng" = biên lai đã được <b>Duyệt</b> trong kỳ. "Chờ duyệt" = đã gửi nhưng admin chưa duyệt. Hãy duyệt biên lai để công nợ phản ánh đúng.</div>
       </div>
 
       <!-- Báo cáo -->
@@ -490,6 +504,7 @@
           <li><b>Báo cáo chi tiết:</b> mỗi người — số ngày liên tiếp (streak), tổng đã dậy, tổng chưa dậy.</li>
           <li><b>Xu hướng:</b> biểu đồ cột số lượt điểm danh theo ngày (7 ngày / tháng / tùy chọn).</li>
           <li><b>🏆 Bảng xếp hạng:</b> top chuỗi liên tiếp + top tổng ngày dậy nhiều nhất.</li>
+          <li><b>💰 Công nợ theo kỳ:</b> ai đã/chưa đóng phí tháng (xem mục "Thu phí & Công nợ" ở trên).</li>
           <li>Mọi báo cáo đều có nút <b>📥 Xuất Excel</b>.</li>
         </ul>
         <div class="callout info">💡 "Số ngày liên tiếp" reset về 0 khi quên điểm danh 1 ngày; được giữ liền mạch kể cả sau khi sao lưu/dọn DB.</div>
@@ -504,18 +519,34 @@
           <li><b>📂 Mở trang xem backup:</b> mở file JSON đã tải để xem lại dữ liệu offline, không cần mạng.</li>
           <li><b>♻ Khôi phục từ JSON:</b> dùng khi chuyển sang DB Neon mới (DB cũ đầy) — tải file backup lên để nạp lại toàn bộ.</li>
         </ol>
-        <div class="callout warn">⚠ "Lưu trữ & dọn" và "Khôi phục" sẽ xóa/ghi đè dữ liệu — luôn tải backup JSON trước khi làm.</div>
+        <div class="callout warn">⚠ "Lưu trữ & dọn" và "Khôi phục" sẽ xóa/ghi đè dữ liệu — luôn tải backup JSON trước khi làm. <b>Khôi phục</b> và <b>Xóa toàn bộ thành viên</b> bắt buộc <b>nhập lại mật khẩu admin</b> để xác nhận.</div>
       </div>
 
       <!-- Cài đặt + FAQ -->
       <div class="card">
         <div class="card-title">⚙ Cài đặt & Câu hỏi thường gặp</div>
         <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
-          <li><b>Đổi mật khẩu / email admin:</b> vào tab Cài đặt. Quên mật khẩu → dùng "Quên mật khẩu?" ở trang đăng nhập (mã gửi qua email admin).</li>
+          <li><b>Cấu hình QR / mức phí:</b> tab Cài đặt → "Cấu hình QR thanh toán". Đây cũng là mức phí dùng cho báo cáo công nợ.</li>
+          <li><b>Đổi mật khẩu / email admin:</b> vào tab Cài đặt. Quên mật khẩu → dùng "Quên mật khẩu?" ở trang đăng nhập (mã gửi qua email admin). <b>Đổi mật khẩu sẽ đăng xuất mọi phiên cũ.</b></li>
           <li><b>Thêm admin mới:</b> chạy lệnh <code>npm run create-admin &lt;tên&gt; &lt;mật khẩu&gt;</code> trên máy (cần file .env có DATABASE_URL).</li>
-          <li><b>Thành viên không gửi được biên lai?</b> Kiểm tra họ đã được import chưa (đúng SĐT), và nhập đúng 4 số cuối SĐT khi xác minh.</li>
-          <li><b>Email xác nhận không tới?</b> Kiểm tra cấu hình SMTP trên Vercel (SMTP_USER/SMTP_PASS). Có thể bấm "Gửi lại" ở tab Thanh toán.</li>
+          <li><b>Thành viên không gửi được biên lai?</b> Kiểm tra họ đã được import chưa (đúng SĐT), và nhập đúng 4 số cuối SĐT khi xác minh. Nhập sai <b>5 lần sẽ khóa 15 phút</b> (chống dò).</li>
+          <li><b>Email xác nhận không tới?</b> Kiểm tra cấu hình SMTP trên Vercel (SMTP_USER/SMTP_PASS). Có thể bấm "Gửi lại" ở tab Thanh toán; hệ thống cũng tự thử lại email lỗi mỗi ngày.</li>
+          <li><b>Email gửi vào spam?</b> Dùng địa chỉ gửi (SMTP_FROM) thuộc domain có SPF/DKIM, tránh gửi quá nhiều cùng lúc.</li>
         </ul>
+      </div>
+
+      <!-- Bảo mật & bảo trì -->
+      <div class="card">
+        <div class="card-title">🛡 Bảo mật & bảo trì</div>
+        <ul style="font-size:14px;line-height:1.8;padding-left:20px;">
+          <li><b>Phiên đăng nhập</b> hết hạn sau 12 giờ; đăng nhập sai nhiều lần bị khóa tạm thời.</li>
+          <li><b>Thao tác phá hủy</b> (Khôi phục JSON, Xóa toàn bộ thành viên) bắt buộc nhập lại mật khẩu admin.</li>
+          <li><b>Trang công khai</b> chỉ lộ tên + gợi ý đã che bớt; phải nhập đúng 4 số cuối SĐT mới xem được thông tin/lịch sử.</li>
+          <li><b>Tự dọn dẹp:</b> hệ thống tự dọn dữ liệu tạm (rate-limit, mã reset, log cũ) và thử lại email lỗi hằng ngày (Vercel Cron) — không cần làm thủ công.</li>
+          <li><b>Kiểm tra sức khỏe:</b> mở <code>/api/health</code> để xem máy chủ + database còn sống không (gắn dịch vụ theo dõi uptime nếu cần).</li>
+          <li><b>Khi DB gần đầy:</b> làm theo mục "💾 Sao lưu & Lưu trữ" ở trên.</li>
+        </ul>
+        <div class="callout success">✅ Tổng số liệu (tổng ngày dậy, chuỗi liên tiếp) luôn được giữ liền mạch kể cả sau khi sao lưu/dọn DB hay đổi sang DB mới.</div>
       </div>
     </section>
 
