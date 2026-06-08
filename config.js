@@ -12,6 +12,9 @@ if (isProduction) {
   if (process.env.JWT_SECRET === DEFAULT_JWT_SECRET) {
     throw new Error('JWT_SECRET đang dùng giá trị mặc định trong production. Đổi sang chuỗi random 32+ ký tự.');
   }
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL bắt buộc phải set trong production (Neon connection string).');
+  }
 }
 
 module.exports = {

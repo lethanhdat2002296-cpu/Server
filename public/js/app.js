@@ -808,6 +808,17 @@ function initReportsTab() {
   duesPeriod.max = today.slice(0, 7);
   document.getElementById('dues-load').addEventListener('click', loadDues);
   duesPeriod.addEventListener('change', loadDues);
+  document.getElementById('dues-remind').addEventListener('click', async () => {
+    const period = (duesPeriod.value || '').trim();
+    const n = lastDues && lastDues.summary ? lastDues.summary.unpaid : '?';
+    if (!confirm(`Gửi email NHẮC ĐÓNG PHÍ kỳ ${period} cho ${n} người chưa đóng (có email)?\nTối đa 30 email/lần.`)) return;
+    const btn = document.getElementById('dues-remind');
+    btn.disabled = true; btn.textContent = '⏳ Đang gửi...';
+    const r = await api('POST', `/api/admin/reminders/unpaid?period=${encodeURIComponent(period)}`);
+    btn.disabled = false; btn.textContent = '✉️ Nhắc chưa đóng';
+    if (r && r.ok) showToast('success', 'Đã gửi nhắc', r.data.message);
+    else showToast('error', 'Lỗi', (r && r.data && r.data.error) || 'Không gửi được');
+  });
   document.getElementById('dues-export').addEventListener('click', () => {
     if (!lastDues) return alert('Chưa có dữ liệu');
     const label = { paid: 'Đã đóng', pending: 'Chờ duyệt', unpaid: 'Chưa đóng' };

@@ -3,6 +3,8 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 
+const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+
 let transporter = null;
 function getTransporter() {
   if (transporter !== null) return transporter;
@@ -11,10 +13,20 @@ function getTransporter() {
       host: config.SMTP.host,
       port: config.SMTP.port,
       secure: config.SMTP.secure,
-      auth: { user: config.SMTP.user, pass: config.SMTP.pass }
+      auth: { user: config.SMTP.user, pass: config.SMTP.pass },
+      // Timeout để request thanh toán không bị treo khi SMTP chậm/chết
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
   }
   return transporter;
+}
+
+// Khi không có transporter: prod → coi như LỖI (không "fake ok"); dev → log ra console.
+function noTransporter(devLog) {
+  if (!isProd && devLog) devLog();
+  return isProd ? { ok: false, err: 'SMTP chưa cấu hình' } : { ok: true, dev: true };
 }
 
 // ============== RESET PASSWORD CODE ==============
@@ -32,13 +44,12 @@ async function sendResetCode(toEmail, code, fullName) {
   `;
 
   const t = getTransporter();
-  if (!t) {
+  if (!t) return noTransporter(() => {
     console.log('\n========== [DEV] Email reset code ==========');
     console.log(`To: ${toEmail}`);
     console.log(`Mã: ${code}`);
     console.log('============================================\n');
-    return { ok: true, dev: true };
-  }
+  });
 
   await t.sendMail({
     from: config.SMTP.from,
@@ -161,7 +172,7 @@ async function sendPaymentConfirmation(data) {
 </html>`;
 
   const t = getTransporter();
-  if (!t) {
+  if (!t) return noTransporter(() => {
     console.log('\n========== [DEV] Email payment confirmation ==========');
     console.log(`To: ${toEmail}`);
     console.log(`Subject: ${subject}`);
@@ -169,8 +180,7 @@ async function sendPaymentConfirmation(data) {
     console.log(`Is receipt: ${is_receipt}`);
     console.log(`Detected banks: ${detectedBanksText}`);
     console.log('=======================================================\n');
-    return { ok: true, dev: true };
-  }
+  });
 
   // Chuẩn bị ảnh từ base64 cho attachment inline
   const base64 = image_data.replace(/^data:image\/\w+;base64,/, '');
@@ -295,12 +305,11 @@ async function sendPaymentConfirmed(data) {
 </html>`;
 
   const t = getTransporter();
-  if (!t) {
+  if (!t) return noTransporter(() => {
     console.log('\n========== [DEV] Email payment CONFIRMED ==========');
     console.log(`To: ${toEmail} - Payment #${payment_id} - Admin note: ${admin_note}`);
     console.log('===================================================\n');
-    return { ok: true, dev: true };
-  }
+  });
   await t.sendMail({ from: config.SMTP.from, to: toEmail, subject, html });
   return { ok: true };
 }
@@ -349,14 +358,46 @@ async function sendPaymentRejected(data) {
 </body></html>`;
 
   const t = getTransporter();
-  if (!t) {
+  if (!t) return noTransporter(() => {
     console.log('\n========== [DEV] Email payment REJECTED ==========');
     console.log(`To: ${toEmail} - Payment #${payment_id} - Reason: ${admin_note}`);
     console.log('==================================================\n');
-    return { ok: true, dev: true };
-  }
+  });
   await t.sendMail({ from: config.SMTP.from, to: toEmail, subject, html });
   return { ok: true };
 }
 
-module.exports = { sendResetCode, sendPaymentConfirmation, sendPaymentConfirmed, sendPaymentRejected };
+// ============== NHẮC ĐÓNG PHÍ ĐỊNH KỲ ==============
+async function sendDuesReminder(data) {
+  const { toEmail, full_name, period, amount } = data;
+  const subject = `[5AM Check-in] Nhắc đóng phí thành viên kỳ ${period}`;
+  const amountStr = (Number(amount) || 0).toLocaleString('vi-VN');
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f6fa;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:560px;margin:0 auto;padding:30px 20px;">
+    <div style="background:linear-gradient(135deg,#ff7e5f 0%,#feb47b 100%);padding:26px 24px;border-radius:14px 14px 0 0;text-align:center;color:white;">
+      <h1 style="margin:0;font-size:20px;font-weight:700;">Nhắc đóng phí thành viên</h1>
+      <p style="margin:6px 0 0;opacity:0.95;font-size:14px;">Kỳ ${escapeHtml(period)}</p>
+    </div>
+    <div style="background:white;padding:26px 24px;border-radius:0 0 14px 14px;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+      <p style="font-size:15px;margin:0 0 8px;">Xin chào <strong>${escapeHtml(full_name)}</strong>,</p>
+      <p style="font-size:14px;color:#555;line-height:1.6;">
+        Hệ thống ghi nhận bạn <strong>chưa hoàn tất đóng phí thành viên</strong> kỳ <strong>${escapeHtml(period)}</strong>
+        (mức <strong>${amountStr}đ</strong>). Vui lòng chuyển khoản và gửi biên lai qua trang thanh toán để được ghi nhận.
+      </p>
+      <p style="font-size:13px;color:#95a5a6;line-height:1.6;margin-top:18px;">
+        Nếu bạn đã đóng và đang chờ xác nhận, vui lòng bỏ qua email này.
+      </p>
+    </div>
+  </div>
+</body></html>`;
+  const t = getTransporter();
+  if (!t) return noTransporter(() => {
+    console.log(`[DEV] Nhắc phí ${period} → ${toEmail} (${full_name}) mức ${amountStr}đ`);
+  });
+  await t.sendMail({ from: config.SMTP.from, to: toEmail, subject, html });
+  return { ok: true };
+}
+
+module.exports = { sendResetCode, sendPaymentConfirmation, sendPaymentConfirmed, sendPaymentRejected, sendDuesReminder };

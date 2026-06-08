@@ -2,7 +2,7 @@ const express = require('express');
 const { query, pool } = require('../lib/db');
 const config = require('../config');
 const { adminRequired, passwordConfirmRequired } = require('../middleware/auth');
-const { sendPaymentConfirmed, sendPaymentRejected } = require('../utils/email');
+const { sendPaymentConfirmed, sendPaymentRejected, sendDuesReminder } = require('../utils/email');
 const { nowInTimezone, addDays, daysBetween } = require('../utils/time');
 const { getQrConfig, saveQrConfig } = require('../utils/appconfig');
 const { foldDatesIntoEntry, computeMemberStreak } = require('../utils/stats');
@@ -474,6 +474,41 @@ router.get('/reports/dues', adminRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /reminders/unpaid?period=YYYY-MM → gửi email nhắc cho member CHƯA đóng kỳ (có email)
+router.post('/reminders/unpaid', adminRequired, async (req, res, next) => {
+  try {
+    let period = String(req.query.period || (req.body && req.body.period) || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(period)) period = nowInTimezone().date.slice(0, 7);
+    const cfg = await getQrConfig();
+    // chưa đóng = không có payment confirmed/pending trong kỳ, và CÓ email
+    const r = await query(`
+      SELECT m.id, m.full_name, m.email
+      FROM members m
+      WHERE m.email IS NOT NULL AND m.email <> ''
+        AND NOT EXISTS (
+          SELECT 1 FROM payments p
+          WHERE p.member_id = m.id AND p.period = $1 AND p.status IN ('confirmed','pending')
+        )
+      ORDER BY m.full_name
+      LIMIT 30
+    `, [period]);
+    let sent = 0, failed = 0;
+    for (const m of r.rows) {
+      try {
+        const result = await sendDuesReminder({ toEmail: m.email, full_name: m.full_name, period, amount: cfg.amount });
+        if (result && result.ok) sent++; else failed++;
+      } catch (e) { failed++; }
+    }
+    await logAudit(req.user, 'remind_unpaid', `kỳ ${period}`, `gửi ${sent}, lỗi ${failed}`);
+    res.json({
+      ok: true, period, candidates: r.rows.length, sent, failed,
+      message: `Đã gửi nhắc ${sent}/${r.rows.length} người chưa đóng kỳ ${period}` +
+        (failed ? ` (${failed} lỗi)` : '') +
+        (r.rows.length === 30 ? '. Giới hạn 30 email/lần — chạy lại để gửi tiếp.' : '')
+    });
+  } catch (err) { next(err); }
+});
+
 // ============================================================
 //  CẤU HÌNH QR THANH TOÁN
 // ============================================================
@@ -512,7 +547,7 @@ router.get('/backup', adminRequired, async (req, res, next) => {
       query('SELECT * FROM members ORDER BY id'),
       query('SELECT mc.*, m.phone AS member_phone FROM member_checkins mc JOIN members m ON m.id = mc.member_id ORDER BY mc.check_date'),
       query('SELECT * FROM payments ORDER BY id'),
-      query('SELECT * FROM audit_log ORDER BY id'),
+      query('SELECT * FROM audit_log ORDER BY id DESC LIMIT 5000'),
       query('SELECT payload FROM archive_data WHERE id = 1')
     ]);
     res.json({
