@@ -4,6 +4,7 @@ const config = require('../config');
 const { adminRequired } = require('../middleware/auth');
 const { sendPaymentConfirmed, sendPaymentRejected } = require('../utils/email');
 const { nowInTimezone, addDays, daysBetween } = require('../utils/time');
+const { getQrConfig, saveQrConfig } = require('../utils/appconfig');
 
 const router = express.Router();
 
@@ -396,6 +397,22 @@ router.get('/reports/range', adminRequired, async (req, res, next) => {
       total_checkins: daily.reduce((s, d) => s + d.count, 0),
       daily, per_member: perMemberRes.rows
     });
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+//  CẤU HÌNH QR THANH TOÁN
+// ============================================================
+router.get('/payment-config', adminRequired, async (req, res, next) => {
+  try {
+    res.json({ config: await getQrConfig() });
+  } catch (err) { next(err); }
+});
+router.put('/payment-config', adminRequired, async (req, res, next) => {
+  try {
+    const saved = await saveQrConfig(req.body || {});
+    await logAudit(req.user, 'update_qr_config', 'payment-config', `${saved.bank_id} ${saved.account_no} ${saved.amount}đ`);
+    res.json({ ok: true, config: saved, message: 'Đã lưu cấu hình QR' });
   } catch (err) { next(err); }
 });
 

@@ -349,6 +349,42 @@
           <button type="submit" class="btn-primary" style="max-width:200px;">Đổi mật khẩu</button>
         </form>
       </div>
+
+      <div class="card">
+        <div class="card-title">💳 Cấu hình QR thanh toán (VietQR)</div>
+        <p style="font-size:13px;color:#7f8c8d;margin-bottom:14px;">
+          Thông tin tài khoản nhận tiền. Mã QR ở trang thanh toán sẽ tự sinh theo cấu hình này.
+        </p>
+        <form id="qr-form">
+          <div class="form-row">
+            <div class="form-group"><label>Ngân hàng *</label><input type="text" name="bank_id" placeholder="Techcombank" required><div class="field-hint">Tên/mã ngân hàng VietQR (vd: Techcombank, VCB, MB...)</div><div class="field-error"></div></div>
+            <div class="form-group"><label>Số tài khoản *</label><input type="text" name="account_no" placeholder="19036020562019" required><div class="field-error"></div></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Tên tài khoản *</label><input type="text" name="account_name" placeholder="HOANG LIEN" required><div class="field-error"></div></div>
+            <div class="form-group"><label>Số tiền (VND) *</label><input type="number" name="amount" min="0" placeholder="500000" required><div class="field-error"></div></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Nội dung chuyển khoản *</label><input type="text" name="description" maxlength="100" placeholder="5AM Club" required><div class="field-error"></div></div>
+            <div class="form-group"><label>Mẫu QR</label>
+              <select name="template" style="width:100%;padding:12px 14px;border:1.5px solid #dfe6e9;border-radius:10px;font-size:14px;background:#fafbfc;">
+                <option value="print">print (đầy đủ thông tin)</option>
+                <option value="compact">compact</option>
+                <option value="compact2">compact2</option>
+                <option value="qr_only">qr_only (chỉ mã QR)</option>
+              </select>
+            </div>
+          </div>
+          <div id="qr-msg" class="message"></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button type="submit" class="btn-primary" style="max-width:200px;">Lưu cấu hình QR</button>
+            <button type="button" class="btn-secondary" id="qr-preview-btn" style="width:auto;padding:10px 16px;">👁 Xem thử QR</button>
+          </div>
+          <div id="qr-preview" style="margin-top:14px;text-align:center;display:none;">
+            <img id="qr-preview-img" style="max-width:240px;border:1px solid #ecf0f1;border-radius:10px;">
+          </div>
+        </form>
+      </div>
     </section>
 
     <!-- ============ HƯỚNG DẪN SỬ DỤNG ============ -->

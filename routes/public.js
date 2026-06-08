@@ -5,8 +5,18 @@ const { analyzeReceiptText } = require('../utils/receipt');
 const { sendPaymentConfirmation } = require('../utils/email');
 const { validateEmail, validatePhone, validateFullName } = require('../utils/validators');
 const { getClientIp, checkRateLimit } = require('../utils/ratelimit');
+const { getQrConfig } = require('../utils/appconfig');
 
 const router = express.Router();
+
+// ============== CẤU HÌNH QR THANH TOÁN (public) ==============
+// Trang thanh toán cần để sinh mã VietQR
+router.get('/payment-config', async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json({ config: await getQrConfig() });
+  } catch (err) { next(err); }
+});
 
 // Rate-limit nhẹ cho việc dò danh sách (search + detail): 120 req / 10 phút / IP
 async function lookupLimit(req, res, next) {

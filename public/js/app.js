@@ -120,7 +120,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     if (target === 'payments') { initPaymentsTab(); loadPayments(); }
     if (target === 'reports') initReportsTab();
     if (target === 'backup') { initBackupTab(); loadBackupStatus(); }
-    if (target === 'settings') { initSettingsTab(); loadProfile(); }
+    if (target === 'settings') { initSettingsTab(); loadProfile(); loadQrConfig(); }
   });
 });
 
@@ -836,7 +836,54 @@ function initSettingsTab() {
       showMsg('password-msg', 'error', r?.data?.error || 'Lỗi');
     }
   });
+
+  // Cấu hình QR thanh toán
+  document.getElementById('qr-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const data = {
+      bank_id: f.bank_id.value.trim(), account_no: f.account_no.value.trim(),
+      account_name: f.account_name.value.trim(), amount: f.amount.value,
+      description: f.description.value.trim(), template: f.template.value
+    };
+    const r = await api('PUT', '/api/admin/payment-config', data);
+    if (r && r.ok) {
+      showMsg('qr-msg', 'success', '✓ ' + r.data.message);
+      fillQrForm(r.data.config);
+    } else showMsg('qr-msg', 'error', r?.data?.error || 'Lỗi');
+  });
+  document.getElementById('qr-preview-btn').addEventListener('click', () => {
+    const f = document.getElementById('qr-form');
+    const cfg = {
+      bank_id: f.bank_id.value.trim(), account_no: f.account_no.value.trim(),
+      account_name: f.account_name.value.trim(), amount: f.amount.value,
+      description: f.description.value.trim(), template: f.template.value
+    };
+    document.getElementById('qr-preview-img').src = buildVietQrUrl(cfg);
+    document.getElementById('qr-preview').style.display = 'block';
+  });
 }
+
+// Sinh URL ảnh VietQR từ cấu hình
+function buildVietQrUrl(cfg) {
+  const base = `https://img.vietqr.io/image/${encodeURIComponent(cfg.bank_id)}-${encodeURIComponent(cfg.account_no)}-${encodeURIComponent(cfg.template || 'print')}.png`;
+  const q = `amount=${encodeURIComponent(cfg.amount || 0)}&addInfo=${encodeURIComponent(cfg.description || '')}&accountName=${encodeURIComponent(cfg.account_name || '')}`;
+  return `${base}?${q}`;
+}
+function fillQrForm(cfg) {
+  const f = document.getElementById('qr-form');
+  f.bank_id.value = cfg.bank_id || '';
+  f.account_no.value = cfg.account_no || '';
+  f.account_name.value = cfg.account_name || '';
+  f.amount.value = cfg.amount || 0;
+  f.description.value = cfg.description || '';
+  f.template.value = cfg.template || 'print';
+}
+async function loadQrConfig() {
+  const r = await api('GET', '/api/admin/payment-config');
+  if (r && r.ok) fillQrForm(r.data.config);
+}
+
 async function loadProfile() {
   const r = await api('GET', '/api/settings/me');
   if (!r || !r.ok) return;

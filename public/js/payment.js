@@ -311,3 +311,58 @@ document.getElementById('pay-again').addEventListener('click', () => {
   document.getElementById('pay-message').className = 'message';
   loadHistory();
 });
+
+// ============ MÃ QR CHUYỂN KHOẢN (VietQR) — hiệu lực 120s ============
+const QR_TTL = 120;
+let qrTimer = null, qrConfig = null;
+
+function buildVietQrUrl(cfg) {
+  const base = `https://img.vietqr.io/image/${encodeURIComponent(cfg.bank_id)}-${encodeURIComponent(cfg.account_no)}-${encodeURIComponent(cfg.template || 'print')}.png`;
+  // Dùng encodeURIComponent (dấu cách → %20) để nội dung CK đúng "5AM Club", không thành "5AM+Club"
+  const q = `amount=${encodeURIComponent(cfg.amount || 0)}&addInfo=${encodeURIComponent(cfg.description || '')}&accountName=${encodeURIComponent(cfg.account_name || '')}`;
+  return `${base}?${q}`;
+}
+function fmtVnd(n) { try { return Number(n).toLocaleString('vi-VN'); } catch (e) { return n; } }
+
+function startQrCountdown() {
+  clearInterval(qrTimer);
+  document.getElementById('qr-expired').style.display = 'none';
+  let left = QR_TTL;
+  const el = document.getElementById('qr-timer');
+  const render = () => { const m = Math.floor(left / 60), s = left % 60; el.textContent = `⏱ Mã có hiệu lực: ${m}:${String(s).padStart(2, '0')}`; };
+  render();
+  qrTimer = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(qrTimer);
+      el.textContent = '⏱ Mã QR đã hết hạn';
+      document.getElementById('qr-expired').style.display = 'flex';
+      return;
+    }
+    render();
+  }, 1000);
+}
+
+async function initQr() {
+  const box = document.getElementById('qr-box');
+  try {
+    const res = await fetch('/api/public/payment-config');
+    const data = await res.json();
+    qrConfig = data.config;
+  } catch (e) { box.style.display = 'none'; return; }
+  if (!qrConfig || !qrConfig.account_no) { box.style.display = 'none'; return; }
+
+  document.getElementById('qr-img').src = buildVietQrUrl(qrConfig);
+  document.getElementById('qr-info').innerHTML =
+    `🏦 ${escapeText(qrConfig.bank_id)} • <b>${escapeText(qrConfig.account_no)}</b><br>` +
+    `👤 ${escapeText(qrConfig.account_name)}<br>` +
+    `💰 <b>${fmtVnd(qrConfig.amount)} VND</b> • 📝 ${escapeText(qrConfig.description)}`;
+  startQrCountdown();
+
+  document.getElementById('qr-refresh').addEventListener('click', () => {
+    // Làm mới: tải lại ảnh + chạy lại đồng hồ 120s
+    document.getElementById('qr-img').src = buildVietQrUrl(qrConfig) + '&_=' + Date.now();
+    startQrCountdown();
+  });
+}
+initQr();

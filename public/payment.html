@@ -55,6 +55,21 @@
       <!-- CỘT PHẢI: GỬI BIÊN LAI -->
       <div class="auth-card" style="padding:22px;">
         <div class="card-title">💳 Gửi biên lai mới</div>
+
+        <!-- Mã QR chuyển khoản -->
+        <div id="qr-box" style="text-align:center;margin-bottom:18px;padding:14px;border:1px solid #ecf0f1;border-radius:12px;background:#fafbfc;">
+          <div style="font-weight:600;margin-bottom:10px;">📲 Quét mã để chuyển khoản</div>
+          <div style="position:relative;display:inline-block;">
+            <img id="qr-img" alt="Mã QR" style="max-width:240px;width:100%;border-radius:8px;display:block;">
+            <div id="qr-expired" style="position:absolute;inset:0;background:rgba(255,255,255,0.93);flex-direction:column;align-items:center;justify-content:center;border-radius:8px;display:none;">
+              <div style="color:#d63031;font-weight:700;margin-bottom:10px;">⏱ Mã QR đã hết hạn</div>
+              <button type="button" id="qr-refresh" class="btn-primary" style="width:auto;padding:8px 18px;">🔄 Làm mới</button>
+            </div>
+          </div>
+          <div id="qr-timer" style="font-size:14px;font-weight:700;color:#e17055;margin-top:8px;"></div>
+          <div id="qr-info" style="font-size:12.5px;color:#555;margin-top:6px;line-height:1.7;text-align:left;display:inline-block;"></div>
+        </div>
+
         <form id="pay-form">
           <div class="form-group">
             <label>Số điện thoại *</label>
