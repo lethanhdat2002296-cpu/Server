@@ -36,18 +36,37 @@
       </div>
     </div>
 
-    <!-- 2 cột: trái lịch sử, phải gửi biên lai -->
+    <!-- 2 cột: trái = QR + lịch sử, phải = gửi biên lai -->
     <div class="pay-grid">
-      <!-- CỘT TRÁI: LỊCH SỬ -->
-      <div class="auth-card" style="padding:22px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div class="card-title" style="margin-bottom:0;">📋 Lịch sử thanh toán</div>
-          <button type="button" class="btn-secondary" id="hist-refresh" style="width:auto;padding:6px 12px;font-size:12px;" disabled>🔄</button>
+      <!-- CỘT TRÁI: QR + LỊCH SỬ -->
+      <div class="pay-col">
+        <!-- Mã QR chuyển khoản -->
+        <div class="auth-card" style="padding:22px;">
+          <div class="card-title">📲 Quét mã để chuyển khoản</div>
+          <div id="qr-box" style="text-align:center;">
+            <div style="position:relative;display:inline-block;">
+              <img id="qr-img" alt="Mã QR" style="max-width:260px;width:100%;border-radius:8px;display:block;">
+              <div id="qr-expired" style="position:absolute;inset:0;background:rgba(255,255,255,0.93);flex-direction:column;align-items:center;justify-content:center;border-radius:8px;display:none;">
+                <div style="color:#d63031;font-weight:700;margin-bottom:10px;">⏱ Mã QR đã hết hạn</div>
+                <button type="button" id="qr-refresh" class="btn-primary" style="width:auto;padding:8px 18px;">🔄 Làm mới</button>
+              </div>
+            </div>
+            <div id="qr-timer" style="font-size:14px;font-weight:700;color:#e17055;margin-top:10px;"></div>
+            <div id="qr-info" style="font-size:13px;color:#555;margin-top:8px;line-height:1.8;text-align:left;display:inline-block;background:#fafbfc;padding:10px 14px;border-radius:10px;"></div>
+          </div>
         </div>
-        <div id="hist-list">
-          <div class="empty-state" style="padding:30px 10px;">
-            <div class="ico">🔎</div>
-            <div>Chọn tên của bạn ở trên để xem lịch sử thanh toán và trạng thái.</div>
+
+        <!-- Lịch sử thanh toán -->
+        <div class="auth-card" style="padding:22px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div class="card-title" style="margin-bottom:0;">📋 Lịch sử thanh toán</div>
+            <button type="button" class="btn-secondary" id="hist-refresh" style="width:auto;padding:6px 12px;font-size:12px;" disabled>🔄</button>
+          </div>
+          <div id="hist-list">
+            <div class="empty-state" style="padding:24px 10px;">
+              <div class="ico">🔎</div>
+              <div>Chọn tên của bạn ở trên để xem lịch sử thanh toán và trạng thái.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -55,20 +74,7 @@
       <!-- CỘT PHẢI: GỬI BIÊN LAI -->
       <div class="auth-card" style="padding:22px;">
         <div class="card-title">💳 Gửi biên lai mới</div>
-
-        <!-- Mã QR chuyển khoản -->
-        <div id="qr-box" style="text-align:center;margin-bottom:18px;padding:14px;border:1px solid #ecf0f1;border-radius:12px;background:#fafbfc;">
-          <div style="font-weight:600;margin-bottom:10px;">📲 Quét mã để chuyển khoản</div>
-          <div style="position:relative;display:inline-block;">
-            <img id="qr-img" alt="Mã QR" style="max-width:240px;width:100%;border-radius:8px;display:block;">
-            <div id="qr-expired" style="position:absolute;inset:0;background:rgba(255,255,255,0.93);flex-direction:column;align-items:center;justify-content:center;border-radius:8px;display:none;">
-              <div style="color:#d63031;font-weight:700;margin-bottom:10px;">⏱ Mã QR đã hết hạn</div>
-              <button type="button" id="qr-refresh" class="btn-primary" style="width:auto;padding:8px 18px;">🔄 Làm mới</button>
-            </div>
-          </div>
-          <div id="qr-timer" style="font-size:14px;font-weight:700;color:#e17055;margin-top:8px;"></div>
-          <div id="qr-info" style="font-size:12.5px;color:#555;margin-top:6px;line-height:1.7;text-align:left;display:inline-block;"></div>
-        </div>
+        <p style="font-size:13px;color:#7f8c8d;margin:-6px 0 14px;">Sau khi quét mã & chuyển khoản, đính ảnh biên lai và gửi.</p>
 
         <form id="pay-form">
           <div class="form-group">

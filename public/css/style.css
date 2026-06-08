@@ -491,7 +491,10 @@ a { color: #0984e3; text-decoration: none; }
   gap: 18px;
   align-items: start;
 }
-.pay-grid .auth-card { margin-bottom: 0; }
+.pay-grid > .auth-card { margin-bottom: 0; }
+/* Cột trái gộp QR + lịch sử, xếp dọc có khoảng cách */
+.pay-col { display: flex; flex-direction: column; gap: 18px; }
+.pay-col .auth-card { margin-bottom: 0; }
 @media (max-width: 760px) {
   .pay-grid { grid-template-columns: 1fr; }
 }
